@@ -1,11 +1,14 @@
+import logging
+
 from time import time
 
 from .path import single_source_shortest_path
 from .classes import Column
 from .consts import EPSILON, MAX_LABEL_COST, MIN_COL_VOL
 
-
 __all__ = ["find_ue", "perform_column_generation", "perform_network_assignment"]
+
+logger = logging.getLogger(__name__)
 
 
 def _update_link_cost_array(spnetworks):
@@ -116,10 +119,8 @@ def _update_column_gradient_cost_and_flow(column_pool, links, agent_types, iter_
 
     rel_gap = total_gap / max(total_sys_travel_time, EPSILON)
 
-    print(
-        f"current iteration number in column update: {iter_num}\n"
-        f"total gap: {total_gap:.4e}; relative gap: {rel_gap:.4%}"
-    )
+    logger.info("Current iteration number in column update: %d", iter_num)
+    logger.info("Total gap: %.4e; Relative gap: %.4f%%", total_gap, rel_gap * 100)
 
     return total_gap, rel_gap
 
@@ -246,7 +247,7 @@ def _update_column_attributes(column_pool, links, agent_types):
             total_gap += col.get_gap()
 
     rel_gap = total_gap / max(total_sys_travel_time, EPSILON)
-    print(
+    logger.info(
         "current iteration number in column update: postprocessing\n"
         f"total gap: {total_gap:.4e}; relative gap: {rel_gap:.4%}\n"
     )
@@ -336,11 +337,11 @@ def perform_column_generation(column_gen_num, column_update_num, rel_gap_toleran
     ats = A.get_agent_types()
     column_pool = A.get_column_pool()
 
-    print("find user equilibrium (UE)")
+    logger.info("find user equilibrium (UE)")
     st = time()
 
     for i in range(column_gen_num):
-        print(f"current iteration number in column generation: {i}")
+        logger.info(f"current iteration number in column generation: {i}")
 
         _update_link_and_column_volume(column_pool, links, i)
         _update_link_travel_time(links)
@@ -349,7 +350,7 @@ def perform_column_generation(column_gen_num, column_update_num, rel_gap_toleran
         # loop through all centroids on the base network
         _generate_column_pool(A.get_spnetworks(), column_pool, i)
 
-    print(f"\nprocessing time of generating columns: {time()-st:.2f} s\n")
+    logger.info(f"\nprocessing time of generating columns: {time()-st:.2f} s\n")
 
     for i in range(column_update_num):
         _update_link_and_column_volume(column_pool, links, i, False)

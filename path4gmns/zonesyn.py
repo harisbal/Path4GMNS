@@ -227,7 +227,7 @@ def _synthesize_demand(ui, total_demand, time_budget, mode):
 
     if not column_pool:
         warnings.warn(
-            f'ZERO demand is synthesized!! Please check speed and length units'
+            'ZERO demand is synthesized!! Please check speed and length units'
             ' in link.csv, and time_budget!'
         )
 

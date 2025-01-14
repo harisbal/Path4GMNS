@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "path4gmns"
+version = "0.10.0"                                                                                                    # Replace with your actual version from `__init__.py`
+description = "An open-source, cross-platform, lightweight, and fast Python path engine for networks encoded in GMNS"
+readme = "README.md"
+# long_description_content_type = "text/markdown"
+license = { text = "Apache License 2.0" }
+authors = [
+    { name = "Dr. Xuesong Zhou", email = "xzhou74@asu.edu" },
+    { name = "Dr. Peiheng Li", email = "jdlph@hotmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/jdlph/PATH4GMNS"
+
+[tool.setuptools.packages.find]
+include = ["path4gmns"]
+
+[tool.ruff]
+line-length = 88
+# select = ["E", "F"]  # Adjust to your linting needs
+lint.ignore = ["F403"] # Example of ignoring specific errors

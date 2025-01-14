@@ -1,4 +1,3 @@
-from math import ceil
 
 
 __all__ = ['perform_simple_simulation']
