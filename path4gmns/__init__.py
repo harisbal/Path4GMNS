@@ -14,7 +14,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-__version__ = "0.10.0"
+__version__ = "0.10.1"
 
 # print out the current version
 logging.info(f"path4gmns, version {__version__}\n")

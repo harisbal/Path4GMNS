@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "path4gmns"
-version = "0.10.0"                                                                                                    # Replace with your actual version from `__init__.py`
+version = "0.10.1" # Replace with your actual version from `__init__.py`
 description = "An open-source, cross-platform, lightweight, and fast Python path engine for networks encoded in GMNS"
 readme = "README.md"
 # long_description_content_type = "text/markdown"
