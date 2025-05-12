@@ -6,17 +6,21 @@ from math import ceil, floor
 from random import choice, randint
 
 from .consts import EPSILON, MAX_LABEL_COST, SECONDS_IN_MINUTE, SECONDS_IN_HOUR
-from .path import benchmark_apsp, find_path_for_agents, find_shortest_path, \
-                  get_shortest_path_tree, single_source_shortest_path
+from .path import (
+    benchmark_apsp,
+    find_path_for_agents,
+    find_shortest_path,
+    get_shortest_path_tree,
+    single_source_shortest_path,
+)
 
 
-__all__ = ['UI']
+__all__ = ["UI"]
 
 
 class Node:
-
-    def __init__(self, node_no, node_id, zone_id, x='', y='', is_activity_node=False):
-        """ the attributes of node  """
+    def __init__(self, node_no, node_id, zone_id, x="", y="", is_activity_node=False):
+        """the attributes of node"""
         # node_no: internal node index used for calculation
         self.node_no = node_no
         # node_id: user defined node id from input
@@ -45,7 +49,7 @@ class Node:
         return self.node_no
 
     def get_coordinate(self):
-        return self.coord_x + ' ' + self.coord_y
+        return self.coord_x + " " + self.coord_y
 
     def add_outgoing_link(self, link):
         self.outgoing_links.append(link)
@@ -62,24 +66,25 @@ class Node:
 
 
 class Link:
-
-    def __init__(self,
-                 id,
-                 link_no,
-                 from_node_no,
-                 to_node_no,
-                 from_node_id,
-                 to_node_id,
-                 length,
-                 lanes=1,
-                 link_type=1,
-                 free_speed=60,
-                 capacity=1999,
-                 toll = 0,
-                 allowed_uses='all',
-                 geometry='',
-                 demand_period_size=1):
-        """ the attributes of link """
+    def __init__(
+        self,
+        id,
+        link_no,
+        from_node_no,
+        to_node_no,
+        from_node_id,
+        to_node_id,
+        length,
+        lanes=1,
+        link_type=1,
+        free_speed=60,
+        capacity=1999,
+        toll=0,
+        allowed_uses="all",
+        geometry="",
+        demand_period_size=1,
+    ):
+        """the attributes of link"""
         self.id = id
         self.link_no = link_no
         self.from_node_no = from_node_no
@@ -92,9 +97,7 @@ class Link:
         # 1: one direction, 2: two way
         self.type = link_type
         # free flow travel time in minutes, free_speed is either mile/h or km/h
-        self.fftt = (
-            length / max(EPSILON, free_speed) * 60
-        )
+        self.fftt = length / max(EPSILON, free_speed) * 60
         # capacity is lane capacity per hour
         self.link_capacity = capacity * lanes
         self.allowed_uses = allowed_uses
@@ -158,8 +161,9 @@ class Link:
         try:
             return self.vdfperiods[tau].get_fftt()
         except IndexError:
-            raise Exception(f'NO such demand period id: {tau}!'
-                            ' Check your input demand_period_id')
+            raise Exception(
+                f"NO such demand period id: {tau}! Check your input demand_period_id"
+            )
 
     def get_period_avg_travel_time(self, tau):
         return self.vdfperiods[tau].get_avg_travel_time()
@@ -180,8 +184,8 @@ class Link:
 
     def calculate_td_vdf(self):
         for tau in range(self.demand_period_size):
-            self.travel_time_by_period[tau] = (
-                self.vdfperiods[tau].run_bpr(self.flow_vol_by_period[tau])
+            self.travel_time_by_period[tau] = self.vdfperiods[tau].run_bpr(
+                self.flow_vol_by_period[tau]
             )
 
     def update_waiting_time(self, minute, wt):
@@ -195,14 +199,16 @@ class Link:
 
 
 class Agent:
-    """ individual agent derived from aggregated demand between an OD pair
+    """individual agent derived from aggregated demand between an OD pair
 
     id: integer starts from 1
     seq_no: internal agent index starting from 0 used for calculation
     """
-    def __init__(self, agent_id, agent_no, agent_type_id, demand_period_id,
-                 o_zone_id, d_zone_id):
-        """ the attribute of agent """
+
+    def __init__(
+        self, agent_id, agent_no, agent_type_id, demand_period_id, o_zone_id, d_zone_id
+    ):
+        """the attribute of agent"""
         self.id = agent_id
         self.seq_no = agent_no
         # vehicle
@@ -276,7 +282,7 @@ class Agent:
         self.link_dep_interval[self.curr_link_pos] = i
 
     def set_arr_interval(self, i, increment=0):
-        self.link_arr_interval[self.curr_link_pos-increment] = i
+        self.link_arr_interval[self.curr_link_pos - increment] = i
 
     def get_arr_interval(self):
         return self.link_arr_interval[self.curr_link_pos]
@@ -293,7 +299,6 @@ class Agent:
 
 
 class Zone:
-
     def __init__(self, zone_id, bin_index=0):
         self.no = -1
         self.id = str(zone_id)
@@ -335,24 +340,39 @@ class Zone:
 
     def get_coordinate_str(self):
         if self.coord_x == 91 or self.coord_y == 181:
-            return ''
+            return ""
 
-        return str(self.coord_x) + ' ' + str(self.coord_y)
+        return str(self.coord_x) + " " + str(self.coord_y)
 
     def get_geo(self):
-        """ output the four vertices as boundary """
+        """output the four vertices as boundary"""
         try:
             [U, D, L, R] = self.get_boundaries()
             geo = (
-                'LINESTRING ('
-                + str(L) + ' ' + str(U) + ','
-                + str(R) + ' ' + str(U) + ','
-                + str(R) + ' ' + str(D) + ','
-                + str(L) + ' ' + str(D) + ','
-                + str(L) + ' ' + str(U) + ')'
+                "LINESTRING ("
+                + str(L)
+                + " "
+                + str(U)
+                + ","
+                + str(R)
+                + " "
+                + str(U)
+                + ","
+                + str(R)
+                + " "
+                + str(D)
+                + ","
+                + str(L)
+                + " "
+                + str(D)
+                + ","
+                + str(L)
+                + " "
+                + str(U)
+                + ")"
             )
         except ValueError:
-            geo = 'LINESTRING ()'
+            geo = "LINESTRING ()"
 
         return geo
 
@@ -383,7 +403,6 @@ class Zone:
 
 
 class Network:
-
     def __init__(self):
         self.nodes = []
         self.links = []
@@ -398,7 +417,7 @@ class Network:
         self.node_preds = None
         self.link_preds = None
         self.capi_allocated = False
-        self.agent_type_name = 'all'
+        self.agent_type_name = "all"
         # key: zone id, value: zone object
         self.zones = {}
         self.activity_node_num = 0
@@ -407,7 +426,7 @@ class Network:
         # key: simulation interval, value: agent id
         self.td_agents = {}
         self.len_unit_cf = 1
-        self.len_unit = 'mi'
+        self.len_unit = "mi"
 
     def update(self):
         self.last_thru_node = self.get_node_size()
@@ -476,8 +495,8 @@ class Network:
 
         self.capi_allocated = True
 
-    def init_link_costs(self, cost_type='time'):
-        if cost_type == 'time':
+    def init_link_costs(self, cost_type="time"):
+        if cost_type == "time":
             link_costs = [link.fftt for link in self.links]
         else:
             link_costs = [link.length for link in self.links]
@@ -497,7 +516,7 @@ class Network:
                 continue
 
             # create a centroid
-            node_id = 'c_' + z
+            node_id = "c_" + z
             centroid = Node(node_no, node_id, z)
             # try coordinate of the centroid from each zone first. if the values
             # are invalid, then use that of the first node from each zone.
@@ -522,7 +541,7 @@ class Network:
 
             # build connectors
             for i in self.get_nodes_from_zone(z):
-                link_id_f = 'conn_' + str(link_no)
+                link_id_f = "conn_" + str(link_no)
                 from_node_no = node_no
                 to_node_id = i
 
@@ -532,23 +551,21 @@ class Network:
                     continue
 
                 # connector from centroid to activity nodes in this zone
-                c_forward = Link(link_id_f,
-                                 link_no,
-                                 from_node_no,
-                                 to_node_no,
-                                 node_id,
-                                 to_node_id,
-                                 0)
+                c_forward = Link(
+                    link_id_f, link_no, from_node_no, to_node_no, node_id, to_node_id, 0
+                )
 
                 # connector from activity nodes in this zone to centroid
-                link_id_b = 'conn_' + str(link_no+1)
-                c_backward = Link(link_id_b,
-                                  link_no+1,
-                                  to_node_no,
-                                  from_node_no,
-                                  to_node_id,
-                                  node_id,
-                                  0)
+                link_id_b = "conn_" + str(link_no + 1)
+                c_backward = Link(
+                    link_id_b,
+                    link_no + 1,
+                    to_node_no,
+                    from_node_no,
+                    to_node_id,
+                    node_id,
+                    0,
+                )
 
                 self.nodes[from_node_no].add_outgoing_link(c_forward)
                 self.nodes[to_node_no].add_outgoing_link(c_backward)
@@ -576,24 +593,15 @@ class Network:
             oz = k[2]
             dz = k[3]
 
-            vol = int(cv.get_od_volume()+1)
+            vol = int(cv.get_od_volume() + 1)
             for _ in range(vol):
                 # construct agent using valid record
-                agent = Agent(agent_id,
-                              agent_no,
-                              at,
-                              dp,
-                              oz,
-                              dz)
+                agent = Agent(agent_id, agent_no, at, dp, oz, dz)
 
                 # step 1 generate o_node_id and d_node_id randomly
                 # according to o_zone_id and d_zone_id
-                agent.o_node_id = choice(
-                    self.zones[oz].get_nodes()
-                )
-                agent.d_node_id = choice(
-                    self.zones[dz].get_nodes()
-                )
+                agent.o_node_id = choice(self.zones[oz].get_nodes())
+                agent.d_node_id = choice(self.zones[dz].get_nodes())
 
                 # step 2 update agent_id and agent_seq_no
                 agent_id += 1
@@ -601,18 +609,20 @@ class Network:
 
                 self.agents.append(agent)
 
-        print(f'the number of agents is {len(self.agents)}')
+        print(f"the number of agents is {len(self.agents)}")
 
     def _get_agent(self, agent_no):
-        """ retrieve agent using agent_no """
+        """retrieve agent using agent_no"""
         try:
             return self.agents[agent_no]
         except IndexError:
             agent_id = agent_no + 1
-            print(f'Please provide a valid agent id. agent_id: {agent_id} does NOT EXIST!')
+            print(
+                f"Please provide a valid agent id. agent_id: {agent_id} does NOT EXIST!"
+            )
 
     def get_agent_node_path(self, agent_id, cost_type, path_only):
-        """ return the sequence of node IDs along the agent path
+        """return the sequence of node IDs along the agent path
 
         developer's note: consider changing its name to
         get_agent_node_path_str()
@@ -622,25 +632,23 @@ class Network:
 
         path_cost = agent.get_path_cost()
         if path_cost >= MAX_LABEL_COST:
-            return f'path {cost_type}: infinity | path: '
+            return f"path {cost_type}: infinity | path: "
 
-        path = ''
+        path = ""
         if agent.node_path:
-            path = ';'.join(
-                self.map_no_to_id[x] for x in reversed(agent.node_path)
-            )
+            path = ";".join(self.map_no_to_id[x] for x in reversed(agent.node_path))
 
         if path_only:
             return path
         else:
-            unit = 'minutes'
-            if cost_type.startswith('dis'):
-                unit = self.get_length_unit() + 's'
+            unit = "minutes"
+            if cost_type.startswith("dis"):
+                unit = self.get_length_unit() + "s"
 
-            return f'path {cost_type}: {path_cost:.4f} {unit} | node path: {path}'
+            return f"path {cost_type}: {path_cost:.4f} {unit} | node path: {path}"
 
     def get_agent_link_path(self, agent_id, cost_type, path_only):
-        """ return the sequence of link IDs along the agent path
+        """return the sequence of link IDs along the agent path
 
         developer's note: consider changing its name to
         get_agent_link_path_str()
@@ -650,32 +658,32 @@ class Network:
 
         path_cost = agent.get_path_cost()
         if path_cost >= MAX_LABEL_COST:
-            return f'path {cost_type}: infinity | path: '
+            return f"path {cost_type}: infinity | path: "
 
-        path = ''
+        path = ""
         if agent.link_path:
-            path = ';'.join(
+            path = ";".join(
                 self.links[x].get_link_id() for x in reversed(agent.link_path)
             )
 
         if path_only:
             return path
         else:
-            unit = 'minutes'
-            if cost_type.startswith('dis'):
-                unit = self.get_length_unit() + 's'
+            unit = "minutes"
+            if cost_type.startswith("dis"):
+                unit = self.get_length_unit() + "s"
 
-            return f'path {cost_type}: {path_cost:.4f} {unit} | link path: {path}'
+            return f"path {cost_type}: {path_cost:.4f} {unit} | link path: {path}"
 
     def get_agent_orig_node_id(self, agent_id):
-        """ return the origin node id of agent """
+        """return the origin node id of agent"""
         agent_no = agent_id - 1
         agent = self._get_agent(agent_no)
 
         return agent.get_orig_node_id()
 
     def get_agent_dest_node_id(self, agent_id):
-        """ return the origin node id of agent """
+        """return the origin node id of agent"""
         agent_no = agent_id - 1
         agent = self._get_agent(agent_no)
 
@@ -752,7 +760,7 @@ class Network:
         return self.nodes[self.get_node_no(node_id)]
 
     def get_agent_type_name(self):
-        """ for allowed uses in single_source_shortest_path() """
+        """for allowed uses in single_source_shortest_path()"""
         return self.agent_type_name
 
     def get_link_no(self, id):
@@ -762,7 +770,7 @@ class Network:
         return self.agents
 
     def get_last_thru_node(self):
-        """ node no of the first potential centroid """
+        """node no of the first potential centroid"""
         return self.last_thru_node
 
     def set_agent_type_name(self, at_name):
@@ -778,9 +786,9 @@ class Network:
     def get_length_unit(self):
         return self.len_unit
 
-    def get_path_cost(self, to_node_id, cost_type='time'):
+    def get_path_cost(self, to_node_id, cost_type="time"):
         to_node_no = self.map_id_to_no[to_node_id]
-        if cost_type == 'time':
+        if cost_type == "time":
             return self.node_label_cost[to_node_no]
 
         return self.node_label_cost[to_node_no] * self.len_unit_cf
@@ -793,7 +801,8 @@ class Network:
 
 
 class Column:
-    """ column is path """
+    """column is path"""
+
     def __init__(self, id=-1):
         self.id = id
         self.vol = 0
@@ -805,7 +814,7 @@ class Column:
         self.gradient_cost_rel_diff = 0
         self.nodes = None
         self.links = None
-        self.geo = ''
+        self.geo = ""
 
     def get_link_num(self):
         return len(self.links)
@@ -838,11 +847,11 @@ class Column:
         return self.gradient_cost_rel_diff
 
     def get_links(self):
-        """ return link path """
+        """return link path"""
         return self.links
 
     def get_nodes(self):
-        """ return node path """
+        """return node path"""
         return self.nodes
 
     def set_distance(self, d):
@@ -868,8 +877,8 @@ class Column:
 
     def update_gradient_cost_diffs(self, least_gc):
         self.gradient_cost_abs_diff = self.gradient_cost - least_gc
-        self.gradient_cost_rel_diff = (
-            self.gradient_cost_abs_diff / max(EPSILON, least_gc)
+        self.gradient_cost_rel_diff = self.gradient_cost_abs_diff / max(
+            EPSILON, least_gc
         )
 
     def get_gap(self):
@@ -889,13 +898,14 @@ class Column:
 
 
 class ColumnVec:
-    """ column pool for (at, dp, oz, dz)
+    """column pool for (at, dp, oz, dz)
 
     where, at is agent type id,
            dp is demand period id,
            oz is origin zone id,
            dz is destination zone id.
     """
+
     def __init__(self):
         self.od_vol = 0
         self.route_fixed = False
@@ -927,10 +937,18 @@ class ColumnVec:
 
 
 class AgentType:
-
-    def __init__(self, id=0, type='a', name='auto',
-                 vot=10, flow_type=0, pce=1, ffs=60, use_link_ffs=True):
-        """ default constructor """
+    def __init__(
+        self,
+        id=0,
+        type="a",
+        name="auto",
+        vot=10,
+        flow_type=0,
+        pce=1,
+        ffs=60,
+        use_link_ffs=True,
+    ):
+        """default constructor"""
         self.id = id
         self.type = type
         self.name = name
@@ -960,23 +978,22 @@ class AgentType:
 
     @staticmethod
     def get_default_type_str():
-        return 'a'
+        return "a"
 
     @staticmethod
     def get_default_name():
-        return 'auto'
+        return "auto"
 
     @staticmethod
     def get_legacy_type_str():
-        return 'p'
+        return "p"
 
     @staticmethod
     def get_legacy_name():
-        return 'passenger'
+        return "passenger"
 
 
 class SpecialEvent:
-
     def __init__(self, name) -> None:
         self.name = name
         self.affected_links = {}
@@ -986,20 +1003,19 @@ class SpecialEvent:
 
 
 class DemandPeriod:
-
-    def __init__(self, id=0, period='AM', time_period='0700-0800'):
+    def __init__(self, id=0, period="AM", time_period="0700-0800"):
         self.id = id
         self.period = period
         self.time_period = time_period
         self.special_event = None
         self._setup_time()
 
-    def _parse_time_period(self, delim='-'):
+    def _parse_time_period(self, delim="-"):
         s1, s2 = self.time_period.split(delim)
-        t1 = datetime.strptime(s1, '%H%M')
-        t2 = datetime.strptime(s2, '%H%M')
+        t1 = datetime.strptime(s1, "%H%M")
+        t2 = datetime.strptime(s2, "%H%M")
         if t2 <= t1:
-            raise ValueError('ending time <= starting time')
+            raise ValueError("ending time <= starting time")
 
         st_ = t1.hour * 60 + t1.minute
         et_ = t2.hour * 60 + t2.minute
@@ -1011,7 +1027,7 @@ class DemandPeriod:
             st_, et_ = self._parse_time_period()
         except ValueError:
             # backward compatibility for versions <= v0.9.3
-            st_, et_ = self._parse_time_period('_')
+            st_, et_ = self._parse_time_period("_")
         except Exception as e:
             raise e
 
@@ -1025,7 +1041,7 @@ class DemandPeriod:
         return self.period
 
     def get_duration(self):
-        """ duration of demand period in minutes """
+        """duration of demand period in minutes"""
         return self.et - self.st
 
     def get_start_time(self):
@@ -1033,8 +1049,7 @@ class DemandPeriod:
 
 
 class Demand:
-
-    def __init__(self, id=0, period='AM', agent_type='a', file='demand.csv'):
+    def __init__(self, id=0, period="AM", agent_type="a", file="demand.csv"):
         self.id = id
         self.period = period
         self.agent_type_str = agent_type
@@ -1054,10 +1069,10 @@ class Demand:
 
 
 class VDFPeriod:
-
-    def __init__(self, id, alpha=0.15, beta=4, mu=1000,
-                 fftt=0, cap=99999, phf=-1):
-        """ default constructor """
+    def __init__(
+        self, id, alpha=0.15, beta=4, mu=1000, fftt=0, cap=99999, phf=-1, maxtt=999999
+    ):
+        """default constructor"""
         self.id = id
         # the following four have been defined in class Link
         # they should be exactly the same with those in the corresponding link
@@ -1071,6 +1086,7 @@ class VDFPeriod:
         self.avg_travel_time = 0
         self.voc = 0
         self.capacity_ratio = 1
+        self.maxtt = maxtt
 
     def get_avg_travel_time(self):
         return self.avg_travel_time
@@ -1084,18 +1100,16 @@ class VDFPeriod:
     def run_bpr(self, vol):
         vol = max(0, vol)
         self.voc = vol / max(EPSILON, self.capacity * self.capacity_ratio)
-        self.avg_travel_time = (
-            self.fftt
-            + self.fftt
-            * self.alpha
-            * pow(self.voc, self.beta)
+        self.avg_travel_time = self.fftt + self.fftt * self.alpha * pow(
+            self.voc, self.beta
         )
 
-        return self.avg_travel_time
+        return min(self.avg_travel_time, self.maxtt * self.get_fftt())
 
 
 class SPNetwork(Network):
-    """ attributes related to outputs from shortest path calculations """
+    """attributes related to outputs from shortest path calculations"""
+
     def __init__(self, base, at, dp):
         self.base = base
         self.nodes = self.base.get_nodes()
@@ -1176,7 +1190,7 @@ class SPNetwork(Network):
     # the following three are shared by all SPNetworks as the underlying
     # network topology
     def get_last_thru_node(self):
-        """ node no of the first potential centroid """
+        """node no of the first potential centroid"""
         return self.base.get_last_thru_node()
 
     def get_orig_centroids(self):
@@ -1188,7 +1202,8 @@ class SPNetwork(Network):
 
 
 class AccessNetwork(Network):
-    """ network for accessibility evaluation """
+    """network for accessibility evaluation"""
+
     def __init__(self, base, add_cc=True):
         self.base = base
         self.nodes = self.base.get_nodes()
@@ -1198,8 +1213,8 @@ class AccessNetwork(Network):
         self.map_id_to_no = self.base.map_id_to_no
         self.map_no_to_id = self.base.map_no_to_id
         self.centroids_added = self.base.centroids_added
-        self.agent_type_name = 'all'
-        self.pre_source_node_id = ''
+        self.agent_type_name = "all"
+        self.pre_source_node_id = ""
         if add_cc:
             self._add_centroids_connectors()
         self.capi_allocated = False
@@ -1224,13 +1239,13 @@ class AccessNetwork(Network):
         return self.base.get_nodes_from_zone(zone_id)
 
     def _get_zone_coord(self, zone_id):
-        """ coordinate of each zone is from its first node """
+        """coordinate of each zone is from its first node"""
         node_id = self.get_nodes_from_zone(zone_id)[0]
         node = self.get_node(node_id)
         return node.coord_x, node.coord_y
 
     def set_target_mode(self, mode):
-        """ set up the target mode for accessibility evaluation
+        """set up the target mode for accessibility evaluation
 
         Parameters
         ----------
@@ -1296,16 +1311,16 @@ class AccessNetwork(Network):
         return super().get_allowed_uses()
 
     def get_last_thru_node(self):
-        """ node no of the first centroid """
+        """node no of the first centroid"""
         return self.base.get_last_thru_node()
 
     def get_pred_link_id(self, node_id):
-        """ return id of the predecessor link to node_id """
+        """return id of the predecessor link to node_id"""
         link_no = self.link_preds[self.get_node_no(node_id)]
         return self.links[link_no].get_link_id()
 
     def get_sp_distance(self, node_no):
-        """ get the shortest path distance """
+        """get the shortest path distance"""
         if self.link_preds[node_no] == -1:
             return MAX_LABEL_COST
 
@@ -1320,13 +1335,13 @@ class AccessNetwork(Network):
         return dist
 
     def update_generalized_link_cost(self, at, time_dependent, demand_period_id):
-        """ update generalized link costs to calculate accessibility """
+        """update generalized link costs to calculate accessibility"""
         vot = at.get_vot()
 
         if time_dependent:
             for link in self.get_links():
                 # do not update connectors
-                if link.get_link_id().startswith('conn_'):
+                if link.get_link_id().startswith("conn_"):
                     continue
 
                 self.link_cost_array[link.get_seq_no()] = (
@@ -1354,7 +1369,6 @@ class AccessNetwork(Network):
 
 
 class Assignment:
-
     def __init__(self):
         self.agent_types = []
         self.demand_periods = []
@@ -1382,12 +1396,12 @@ class Assignment:
         if at.get_type_str() not in self.map_atstr_id:
             self.map_atstr_id[at.get_type_str()] = at.get_id()
         else:
-            raise Exception(f'agent type is not unique: {at.get_type_str()}')
+            raise Exception(f"agent type is not unique: {at.get_type_str()}")
 
         if at.get_name() not in self.map_name_atstr:
             self.map_name_atstr[at.get_name()] = at.get_type_str()
         else:
-            raise Exception(f'agent type name is not unique: {at.get_name()}')
+            raise Exception(f"agent type name is not unique: {at.get_name()}")
 
         self.agent_types.append(at)
 
@@ -1395,7 +1409,7 @@ class Assignment:
         if dp.get_period() not in self.map_dpstr_id:
             self.map_dpstr_id[dp.get_period()] = dp.get_id()
         else:
-            raise Exception(f'demand period is not unique: {dp.get_period()}')
+            raise Exception(f"demand period is not unique: {dp.get_period()}")
 
         self.demand_periods.append(dp)
 
@@ -1403,13 +1417,13 @@ class Assignment:
         try:
             return self.map_atstr_id[at_str]
         except KeyError:
-            raise Exception(f'NO agent type: {at_str}')
+            raise Exception(f"NO agent type: {at_str}")
 
     def get_demand_period_id(self, dp_str):
         try:
             return self.map_dpstr_id[dp_str]
         except KeyError:
-            raise Exception(f'NO demand period: {dp_str}')
+            raise Exception(f"NO demand period: {dp_str}")
 
     def get_agent_type(self, at_str):
         return self.agent_types[self.get_agent_type_id(at_str)]
@@ -1421,13 +1435,13 @@ class Assignment:
         try:
             return self.agent_types[at_id].get_type_str()
         except KeyError:
-            raise Exception(f'NO agent type id: {at_id}')
+            raise Exception(f"NO agent type id: {at_id}")
 
     def get_demand_period_str(self, dp_id):
         try:
             return self.demand_periods[dp_id].get_period()
         except KeyError:
-            raise Exception(f'NO demand period id: {dp_id}')
+            raise Exception(f"NO demand period id: {dp_id}")
 
     def update_demands(self, d):
         self.demands.append(d)
@@ -1455,15 +1469,15 @@ class Assignment:
         return self.network
 
     def get_nodes(self):
-        """ return list of node objects """
+        """return list of node objects"""
         return self.network.get_nodes()
 
     def get_links(self):
-        """ return list of link objects """
+        """return list of link objects"""
         return self.network.get_links()
 
     def get_zones(self):
-        """ return list of zone IDs """
+        """return list of zone IDs"""
         return self.network.get_zones()
 
     def get_column_pool(self):
@@ -1473,28 +1487,28 @@ class Assignment:
         return self.column_pool[(at, dp, orig_zone_id, dest_zone_id)]
 
     def get_agent_orig_node_id(self, agent_id):
-        """ return the origin node id of an agent
+        """return the origin node id of an agent
 
         exception will be handled by _get_agent() in class Network
         """
         return self.network.get_agent_orig_node_id(agent_id)
 
     def get_agent_dest_node_id(self, agent_id):
-        """ return the destination node id of an agent
+        """return the destination node id of an agent
 
         exception will be handled by _get_agent() in class Network
         """
         return self.network.get_agent_dest_node_id(agent_id)
 
-    def get_agent_node_path(self, agent_id, cost_type='time', path_only=True):
-        """ return the sequence of node IDs along the agent path
+    def get_agent_node_path(self, agent_id, cost_type="time", path_only=True):
+        """return the sequence of node IDs along the agent path
 
         exception will be handled by  _get_agent() in class Network
         """
         return self.network.get_agent_node_path(agent_id, cost_type, path_only)
 
-    def get_agent_link_path(self, agent_id, cost_type='time', path_only=True):
-        """ return the sequence of link IDs along the agent path
+    def get_agent_link_path(self, agent_id, cost_type="time", path_only=True):
+        """return the sequence of link IDs along the agent path
 
         exception will be handled by  _get_agent() in class Network
         """
@@ -1511,13 +1525,15 @@ class Assignment:
 
         # for distance-based shortest path calculation only
         # it shall not be used with any accessibility evaluations
-        if mode.startswith('all'):
+        if mode.startswith("all"):
             return mode, mode
 
-        raise Exception(f'{mode} is not existing in settings.yml! Please provide a valid mode!')
+        raise Exception(
+            f"{mode} is not existing in settings.yml! Please provide a valid mode!"
+        )
 
     def find_path_for_agents(self, mode, cost_type):
-        """ find and set up shortest path for each agent """
+        """find and set up shortest path for each agent"""
         # reset agent type str or mode according to user's input
         at_name, _ = self._convert_mode(mode)
         self.network.set_agent_type_name(at_name)
@@ -1525,7 +1541,7 @@ class Assignment:
         find_path_for_agents(self.network, self.column_pool, cost_type)
 
     def find_shortest_path(self, from_node_id, to_node_id, mode, seq_type, cost_type):
-        """ call find_shortest_path() from path.py
+        """call find_shortest_path() from path.py
 
         exceptions will be handled in find_shortest_path()
         """
@@ -1537,8 +1553,9 @@ class Assignment:
         from_node_id = str(from_node_id)
         to_node_id = str(to_node_id)
 
-        return find_shortest_path(self.network, from_node_id,
-                                  to_node_id, seq_type, cost_type)
+        return find_shortest_path(
+            self.network, from_node_id, to_node_id, seq_type, cost_type
+        )
 
     def get_shortest_path_tree(self, from_node_id, mode, seq_type, cost_type):
         # reset agent type str or mode according to user's input
@@ -1549,8 +1566,9 @@ class Assignment:
         # add backward compatibility in case the user still use integer node id's
         from_node_id = str(from_node_id)
 
-        return get_shortest_path_tree(self.network, from_node_id,
-                                      seq_type, cost_type, is_int)
+        return get_shortest_path_tree(
+            self.network, from_node_id, seq_type, cost_type, is_int
+        )
 
     def benchmark_apsp(self):
         benchmark_apsp(self.network)
@@ -1595,15 +1613,15 @@ class Assignment:
         self.has_created_spnet = True
 
     def get_link(self, seq_no):
-        """ return link object corresponding to link seq no """
+        """return link object corresponding to link seq no"""
         return self.network.get_link(seq_no)
 
     def get_link_no(self, id):
-        """ id is string """
+        """id is string"""
         return self.network.get_link_no(id)
 
     def get_node_no(self, id):
-        """ id is integer """
+        """id is integer"""
         return self.network.get_node_no(id)
 
     def get_agents(self):
@@ -1612,13 +1630,14 @@ class Assignment:
     def get_node_label_cost(self, node_no):
         return self.accessnetwork.get_node_label_cost(node_no)
 
-    def get_accessible_nodes(self, source_node_id, time_budget,
-                             mode, time_dependent, tau):
+    def get_accessible_nodes(
+        self, source_node_id, time_budget, mode, time_dependent, tau
+    ):
         source_node_id = str(source_node_id)
         if source_node_id not in self.network.map_id_to_no:
-            raise Exception(f'Node ID: {source_node_id} not in the network')
+            raise Exception(f"Node ID: {source_node_id} not in the network")
 
-        assert(time_budget>=0)
+        assert time_budget >= 0
 
         if time_budget == 0:
             return []
@@ -1636,9 +1655,7 @@ class Assignment:
         if self.accessnetwork.agent_type_name != at_name:
             self.accessnetwork.set_target_mode(at_name)
             at = self.get_agent_type(at_str)
-            self.accessnetwork.update_generalized_link_cost(at,
-                                                            time_dependent,
-                                                            tau)
+            self.accessnetwork.update_generalized_link_cost(at, time_dependent, tau)
             run_sp = True
 
         if run_sp:
@@ -1658,11 +1675,13 @@ class Assignment:
 
         return nodes
 
-    def get_accessible_links(self, source_node_id, time_budget,
-                             mode, time_dependent, tau):
+    def get_accessible_links(
+        self, source_node_id, time_budget, mode, time_dependent, tau
+    ):
         # node id's
-        nodes = self.get_accessible_nodes(source_node_id, time_budget,
-                                          mode, time_dependent, tau)
+        nodes = self.get_accessible_nodes(
+            source_node_id, time_budget, mode, time_dependent, tau
+        )
         # convert to link id's
         return [self.accessnetwork.get_pred_link_id(x) for x in nodes]
 
@@ -1682,11 +1701,11 @@ class Assignment:
         return self.simu_st
 
     def initialize_simulation(self, loading_profile):
-        profiles = ['constant', 'random', 'uniform']
+        profiles = ["constant", "random", "uniform"]
         if loading_profile not in profiles:
             Warning.warn(
-                f'{loading_profile} is not supported!'
-                ' constant loading profile will be adopted.'
+                f"{loading_profile} is not supported!"
+                " constant loading profile will be adopted."
             )
 
         agent_id = 1
@@ -1719,9 +1738,9 @@ class Assignment:
 
                     # constant departure time by default
                     t = self.simu_st
-                    if loading_profile.startswith('uniform'):
+                    if loading_profile.startswith("uniform"):
                         t += int(j / col.get_volume() * self.simu_dur)
-                    elif loading_profile.startswith('random'):
+                    elif loading_profile.startswith("random"):
                         t += randint(0, self.simu_dur - 1)
 
                     # simulation interval
@@ -1791,16 +1810,17 @@ class Assignment:
 
 
 class UI:
-    """ an abstract class only with user interfaces """
+    """an abstract class only with user interfaces"""
+
     def __init__(self, assignment):
         self._base_assignment = assignment
-        self._agent_cost_type = 'time'
+        self._agent_cost_type = "time"
 
     def get_column_pool(self):
         return self._base_assignment.get_column_pool()
 
     def get_column_vec(self, at, dp, orig_zone_id, dest_zone_id):
-        """ get all columns between two zones given agent type and demand period
+        """get all columns between two zones given agent type and demand period
 
         caller is responsible for checking if
         (at, dp, orig_zone_id, dest_zone_id) is in column pool
@@ -1808,27 +1828,32 @@ class UI:
         self._base_assignment.get_column_vec(at, dp, orig_zone_id, dest_zone_id)
 
     def get_agent_orig_node_id(self, agent_id):
-        """ return the origin node id of an agent """
+        """return the origin node id of an agent"""
         return self._base_assignment.get_agent_orig_node_id(agent_id)
 
     def get_agent_dest_node_id(self, agent_id):
-        """ return the destination node id of an agent """
+        """return the destination node id of an agent"""
         return self._base_assignment.get_agent_dest_node_id(agent_id)
 
     def get_agent_node_path(self, agent_id):
-        """ return the sequence of node IDs along the agent path """
-        return self._base_assignment.get_agent_node_path(agent_id, self._agent_cost_type)
+        """return the sequence of node IDs along the agent path"""
+        return self._base_assignment.get_agent_node_path(
+            agent_id, self._agent_cost_type
+        )
 
     def get_agent_link_path(self, agent_id):
-        """ return the sequence of link IDs along the agent path """
-        return self._base_assignment.get_agent_link_path(agent_id, self._agent_cost_type)
+        """return the sequence of link IDs along the agent path"""
+        return self._base_assignment.get_agent_link_path(
+            agent_id, self._agent_cost_type
+        )
 
     def get_agent_num(self):
         return self._base_assignment.network.get_agent_count()
 
-    def get_shortest_path_tree(self, from_node_id,
-                               mode='all', seq_type='node', cost_type='time'):
-        """ return the shorest path tree from the source node (from_node_id)
+    def get_shortest_path_tree(
+        self, from_node_id, mode="all", seq_type="node", cost_type="time"
+    ):
+        """return the shorest path tree from the source node (from_node_id)
 
         Parameters
         ----------
@@ -1867,8 +1892,8 @@ class UI:
             from_node_id, mode, seq_type, cost_type
         )
 
-    def find_path_for_agents(self, mode='all', cost_type='time'):
-        """ DEPRECATED
+    def find_path_for_agents(self, mode="all", cost_type="time"):
+        """DEPRECATED
 
         find and set up shortest path for each agent
 
@@ -1892,9 +1917,10 @@ class UI:
         self._agent_cost_type = cost_type
         return self._base_assignment.find_path_for_agents(mode, cost_type)
 
-    def find_shortest_path(self, from_node_id, to_node_id,
-                           mode='all', seq_type='node', cost_type='time'):
-        """ return shortest path between from_node_id and to_node_id
+    def find_shortest_path(
+        self, from_node_id, to_node_id, mode="all", seq_type="node", cost_type="time"
+    ):
+        """return shortest path between from_node_id and to_node_id
 
         Parameters
         ----------
@@ -1930,20 +1956,18 @@ class UI:
             is not valid node IDs.
         """
         return self._base_assignment.find_shortest_path(
-            from_node_id,
-            to_node_id,
-            mode,
-            seq_type,
-            cost_type
+            from_node_id, to_node_id, mode, seq_type, cost_type
         )
 
-    def get_accessible_nodes(self,
-                             source_node_id,
-                             time_budget,
-                             mode='auto',
-                             time_dependent=False,
-                             demand_period_id=0):
-        """ get the accessible nodes from a node given mode and time budget
+    def get_accessible_nodes(
+        self,
+        source_node_id,
+        time_budget,
+        mode="auto",
+        time_dependent=False,
+        demand_period_id=0,
+    ):
+        """get the accessible nodes from a node given mode and time budget
 
         Parameters
         ----------
@@ -1983,24 +2007,24 @@ class UI:
             the number of nodes that can be accessible from source_node_id
             given time_budget and mode, and the node list
         """
-        nodes = self._base_assignment.get_accessible_nodes(source_node_id,
-                                                           time_budget,
-                                                           mode,
-                                                           time_dependent,
-                                                           demand_period_id)
+        nodes = self._base_assignment.get_accessible_nodes(
+            source_node_id, time_budget, mode, time_dependent, demand_period_id
+        )
 
-        node_strs = ';'.join(str(x) for x in nodes)
+        node_strs = ";".join(str(x) for x in nodes)
 
-        print(f'number of accessible nodes is {len(nodes)}')
-        print(f'accessible nodes are: {node_strs}')
+        print(f"number of accessible nodes is {len(nodes)}")
+        print(f"accessible nodes are: {node_strs}")
 
-    def get_accessible_links(self,
-                             source_node_id,
-                             time_budget,
-                             mode='auto',
-                             time_dependent=False,
-                             demand_period_id=0):
-        """ get the accessible links from a node given mode and time budget
+    def get_accessible_links(
+        self,
+        source_node_id,
+        time_budget,
+        mode="auto",
+        time_dependent=False,
+        demand_period_id=0,
+    ):
+        """get the accessible links from a node given mode and time budget
 
         Parameters
         ----------
@@ -2040,19 +2064,17 @@ class UI:
             the number of links that can be accessible from source_node_id
             given time_budget and mode, and the link list
         """
-        links = self._base_assignment.get_accessible_links(source_node_id,
-                                                           time_budget,
-                                                           mode,
-                                                           time_dependent,
-                                                           demand_period_id)
+        links = self._base_assignment.get_accessible_links(
+            source_node_id, time_budget, mode, time_dependent, demand_period_id
+        )
 
-        link_strs = ';'.join(str(x) for x in links)
+        link_strs = ";".join(str(x) for x in links)
 
-        print(f'number of accessible links is {len(links)}')
-        print(f'accessible links are: {link_strs}')
+        print(f"number of accessible links is {len(links)}")
+        print(f"accessible links are: {link_strs}")
 
     def get_demand_period_str(self, demand_period_id):
-        """ return the demand period name given its id
+        """return the demand period name given its id
 
         Parameters
         ----------
