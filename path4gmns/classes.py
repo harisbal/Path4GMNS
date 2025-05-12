@@ -6,8 +6,8 @@ from math import ceil, floor
 from random import choice, randint
 
 from .consts import EPSILON, MAX_LABEL_COST, SECONDS_IN_MINUTE, SECONDS_IN_HOUR
-from .path import find_path_for_agents, find_shortest_path, \
-                  single_source_shortest_path, benchmark_apsp
+from .path import benchmark_apsp, find_path_for_agents, find_shortest_path, \
+                  get_shortest_path_tree, single_source_shortest_path
 
 
 __all__ = ['UI']
@@ -388,9 +388,6 @@ class Network:
         self.nodes = []
         self.links = []
         self.agents = []
-        self.node_size = 0
-        self.link_size = 0
-        self.agent_size = 0
         # key: node id, value: node seq no
         self.map_id_to_no = {}
         # key: node seq no, value: node id
@@ -409,12 +406,11 @@ class Network:
         self.centroids_added = False
         # key: simulation interval, value: agent id
         self.td_agents = {}
+        self.len_unit_cf = 1
+        self.len_unit = 'mi'
 
     def update(self):
-        self.node_size = len(self.nodes)
-        self.link_size = len(self.links)
-        self.agent_size = len(self.agents)
-        self.last_thru_node = self.node_size
+        self.last_thru_node = self.get_node_size()
         self.activity_node_num = sum(
             z.get_activity_nodes_num() for z in self.zones.values()
         )
@@ -424,8 +420,8 @@ class Network:
         if self.capi_allocated:
             return
 
-        node_size = self.node_size
-        link_size = self.link_size
+        node_size = self.get_node_size()
+        link_size = self.get_link_size()
 
         # initialization for predecessors and label costs
         node_preds = [-1] * node_size
@@ -480,12 +476,21 @@ class Network:
 
         self.capi_allocated = True
 
+    def init_link_costs(self, cost_type='time'):
+        if cost_type == 'time':
+            link_costs = [link.fftt for link in self.links]
+        else:
+            link_costs = [link.length for link in self.links]
+
+        double_arr_link = ctypes.c_double * self.get_link_size()
+        self.link_cost_array = double_arr_link(*link_costs)
+
     def add_centroids_connectors(self):
         if self.centroids_added:
             return
 
-        node_no = self.node_size
-        link_no = self.link_size
+        node_no = self.get_node_size()
+        link_no = self.get_link_size()
         # get zones
         for z in self.get_zones():
             if not z:
@@ -555,8 +560,6 @@ class Network:
 
             node_no += 1
 
-        self.node_size = len(self.nodes)
-        self.link_size = len(self.links)
         self.centroids_added = True
 
     def setup_agents(self, column_pool):
@@ -598,8 +601,7 @@ class Network:
 
                 self.agents.append(agent)
 
-        self.agent_size = len(self.agents)
-        print(f'the number of agents is {self.agent_size}')
+        print(f'the number of agents is {len(self.agents)}')
 
     def _get_agent(self, agent_no):
         """ retrieve agent using agent_no """
@@ -609,7 +611,7 @@ class Network:
             agent_id = agent_no + 1
             print(f'Please provide a valid agent id. agent_id: {agent_id} does NOT EXIST!')
 
-    def get_agent_node_path(self, agent_id, path_only):
+    def get_agent_node_path(self, agent_id, cost_type, path_only):
         """ return the sequence of node IDs along the agent path
 
         developer's note: consider changing its name to
@@ -620,7 +622,7 @@ class Network:
 
         path_cost = agent.get_path_cost()
         if path_cost >= MAX_LABEL_COST:
-            return f'distance: infinity | path: '
+            return f'path {cost_type}: infinity | path: '
 
         path = ''
         if agent.node_path:
@@ -631,9 +633,13 @@ class Network:
         if path_only:
             return path
         else:
-            return f'distance: {path_cost:.2f} mi | node path: {path}'
+            unit = 'minutes'
+            if cost_type.startswith('dis'):
+                unit = self.get_length_unit() + 's'
 
-    def get_agent_link_path(self, agent_id, path_only):
+            return f'path {cost_type}: {path_cost:.4f} {unit} | node path: {path}'
+
+    def get_agent_link_path(self, agent_id, cost_type, path_only):
         """ return the sequence of link IDs along the agent path
 
         developer's note: consider changing its name to
@@ -644,7 +650,7 @@ class Network:
 
         path_cost = agent.get_path_cost()
         if path_cost >= MAX_LABEL_COST:
-            return f'distance: infinity | path: '
+            return f'path {cost_type}: infinity | path: '
 
         path = ''
         if agent.link_path:
@@ -655,7 +661,11 @@ class Network:
         if path_only:
             return path
         else:
-            return f'distance: {path_cost:.2f} mi | link path: {path}'
+            unit = 'minutes'
+            if cost_type.startswith('dis'):
+                unit = self.get_length_unit() + 's'
+
+            return f'path {cost_type}: {path_cost:.4f} {unit} | link path: {path}'
 
     def get_agent_orig_node_id(self, agent_id):
         """ return the origin node id of agent """
@@ -672,7 +682,7 @@ class Network:
         return agent.get_dest_node_id()
 
     def get_agent_count(self):
-        return self.agent_size
+        return len(self.agents)
 
     def get_nodes_from_zone(self, zone_id):
         return self.zones[zone_id].get_nodes()
@@ -681,10 +691,10 @@ class Network:
         return self.map_id_to_no[node_id]
 
     def get_node_size(self):
-        return self.node_size
+        return len(self.nodes)
 
     def get_link_size(self):
-        return self.link_size
+        return len(self.links)
 
     def get_nodes(self):
         return self.nodes
@@ -723,6 +733,9 @@ class Network:
     def get_node_label_costs(self):
         return self.node_label_cost
 
+    def get_node_label_cost(self, node_no):
+        return self.node_label_cost[node_no]
+
     def get_link_costs(self):
         return self.link_cost_array
 
@@ -735,8 +748,11 @@ class Network:
     def get_link(self, seq_no):
         return self.links[seq_no]
 
+    def get_node(self, node_id):
+        return self.nodes[self.get_node_no(node_id)]
+
     def get_agent_type_name(self):
-        """ for allowed uses in single_source_shortest_path()"""
+        """ for allowed uses in single_source_shortest_path() """
         return self.agent_type_name
 
     def get_link_no(self, id):
@@ -758,6 +774,16 @@ class Network:
                 continue
 
             yield v.get_centroid()
+
+    def get_length_unit(self):
+        return self.len_unit
+
+    def get_path_cost(self, to_node_id, cost_type='time'):
+        to_node_no = self.map_id_to_no[to_node_id]
+        if cost_type == 'time':
+            return self.node_label_cost[to_node_no]
+
+        return self.node_label_cost[to_node_no] * self.len_unit_cf
 
     def have_dep_agents(self, i):
         return i in self.td_agents
@@ -1074,8 +1100,6 @@ class SPNetwork(Network):
         self.base = base
         self.nodes = self.base.get_nodes()
         self.links = self.base.get_links()
-        self.node_size = base.get_node_size()
-        self.link_size = base.get_link_size()
         # AgentType object
         self.agent_type = at
         # DemandPeriod object
@@ -1088,9 +1112,6 @@ class SPNetwork(Network):
     def allocate_for_CAPI(self):
         pass
 
-    def get_node_no(self, node_id):
-        return self.base.get_node_no(node_id)
-
     def get_agent_type(self):
         return self.agent_type
 
@@ -1100,6 +1121,9 @@ class SPNetwork(Network):
 
     def get_demand_period(self):
         return self.demand_period
+
+    def get_node_no(self, node_id):
+        return self.base.get_node_no(node_id)
 
     def get_node_size(self):
         return super().get_node_size()
@@ -1149,7 +1173,7 @@ class SPNetwork(Network):
     def get_queue_next(self):
         return super().get_queue_next()
 
-    # the following three are shared by all SPNetworks as the underlying 
+    # the following three are shared by all SPNetworks as the underlying
     # network topology
     def get_last_thru_node(self):
         """ node no of the first potential centroid """
@@ -1169,11 +1193,10 @@ class AccessNetwork(Network):
         self.base = base
         self.nodes = self.base.get_nodes()
         self.links = self.base.get_links()
+        # it will be used by add_centroids_connectors()
         self.zones = self.base.zones
         self.map_id_to_no = self.base.map_id_to_no
         self.map_no_to_id = self.base.map_no_to_id
-        self.node_size = self.base.get_node_size()
-        self.link_size = self.base.get_link_size()
         self.centroids_added = self.base.centroids_added
         self.agent_type_name = 'all'
         self.pre_source_node_id = ''
@@ -1195,7 +1218,7 @@ class AccessNetwork(Network):
         super().add_centroids_connectors()
 
     def get_zones(self):
-        return self.base.get_zones()
+        return super().get_zones()
 
     def get_nodes_from_zone(self, zone_id):
         return self.base.get_nodes_from_zone(zone_id)
@@ -1203,8 +1226,7 @@ class AccessNetwork(Network):
     def _get_zone_coord(self, zone_id):
         """ coordinate of each zone is from its first node """
         node_id = self.get_nodes_from_zone(zone_id)[0]
-        node_no = self.base.get_node_no(node_id)
-        node = self.base.get_nodes()[node_no]
+        node = self.get_node(node_id)
         return node.coord_x, node.coord_y
 
     def set_target_mode(self, mode):
@@ -1223,10 +1245,13 @@ class AccessNetwork(Network):
         return self.agent_type_name
 
     def get_centroids(self):
-        return self.base.get_centroids()
+        return super().get_centroids()
+
+    def get_node(self, node_id):
+        return super().get_node(node_id)
 
     def get_node_no(self, node_id):
-        return self.map_id_to_no[node_id]
+        return super().get_node_no(node_id)
 
     def get_node_size(self):
         return super().get_node_size()
@@ -1258,9 +1283,8 @@ class AccessNetwork(Network):
     def get_node_label_costs(self):
         return super().get_node_label_costs()
 
-    # this function does not exist in class Network
     def get_node_label_cost(self, node_no):
-        return self.node_label_cost[node_no]
+        return super().get_node_label_cost(node_no)
 
     def get_link_costs(self):
         return super().get_link_costs()
@@ -1273,7 +1297,7 @@ class AccessNetwork(Network):
 
     def get_last_thru_node(self):
         """ node no of the first centroid """
-        return self.base.get_node_size()
+        return self.base.get_last_thru_node()
 
     def get_pred_link_id(self, node_id):
         """ return id of the predecessor link to node_id """
@@ -1337,7 +1361,10 @@ class Assignment:
         self.demands = []
         # 4-d array
         self.column_pool = {}
+        # base physical network
         self.network = None
+        # SPNetwork instance for computing shortest paths only
+        self.spnet = None
         self.spnetworks = []
         self.accessnetwork = None
         self.map_atstr_id = {}
@@ -1459,19 +1486,19 @@ class Assignment:
         """
         return self.network.get_agent_dest_node_id(agent_id)
 
-    def get_agent_node_path(self, agent_id, path_only=False):
+    def get_agent_node_path(self, agent_id, cost_type='time', path_only=True):
         """ return the sequence of node IDs along the agent path
 
         exception will be handled by  _get_agent() in class Network
         """
-        return self.network.get_agent_node_path(agent_id, path_only)
+        return self.network.get_agent_node_path(agent_id, cost_type, path_only)
 
-    def get_agent_link_path(self, agent_id, path_only=False):
+    def get_agent_link_path(self, agent_id, cost_type='time', path_only=True):
         """ return the sequence of link IDs along the agent path
 
         exception will be handled by  _get_agent() in class Network
         """
-        return self.network.get_agent_link_path(agent_id, path_only)
+        return self.network.get_agent_link_path(agent_id, cost_type, path_only)
 
     def _convert_mode(self, mode):
         """convert mode to the corresponding agent type name and string"""
@@ -1489,15 +1516,15 @@ class Assignment:
 
         raise Exception(f'{mode} is not existing in settings.yml! Please provide a valid mode!')
 
-    def find_path_for_agents(self, mode):
+    def find_path_for_agents(self, mode, cost_type):
         """ find and set up shortest path for each agent """
         # reset agent type str or mode according to user's input
         at_name, _ = self._convert_mode(mode)
         self.network.set_agent_type_name(at_name)
 
-        find_path_for_agents(self.network, self.column_pool)
+        find_path_for_agents(self.network, self.column_pool, cost_type)
 
-    def find_shortest_path(self, from_node_id, to_node_id, mode, seq_type='node'):
+    def find_shortest_path(self, from_node_id, to_node_id, mode, seq_type, cost_type):
         """ call find_shortest_path() from path.py
 
         exceptions will be handled in find_shortest_path()
@@ -1511,40 +1538,51 @@ class Assignment:
         to_node_id = str(to_node_id)
 
         return find_shortest_path(self.network, from_node_id,
-                                  to_node_id, seq_type)
+                                  to_node_id, seq_type, cost_type)
+
+    def get_shortest_path_tree(self, from_node_id, mode, seq_type, cost_type):
+        # reset agent type str or mode according to user's input
+        at_name, _ = self._convert_mode(mode)
+        self.network.set_agent_type_name(at_name)
+
+        is_int = isinstance(from_node_id, int)
+        # add backward compatibility in case the user still use integer node id's
+        from_node_id = str(from_node_id)
+
+        return get_shortest_path_tree(self.network, from_node_id,
+                                      seq_type, cost_type, is_int)
 
     def benchmark_apsp(self):
         benchmark_apsp(self.network)
 
-    def perform_network_assignment(self, assignment_mode,
-                                   iter_num, column_update_num):
-        # perform_network_assignment(assignment_mode, iter_num, column_update_num)
-        pass
+    def _has_outgoing_links(self, zone_id):
+        return self.network.zones[zone_id].get_centroid().has_outgoing_links()
 
-    def perform_network_assignment_DTALite(self, assignment_mode,
-                                           iter_num, column_update_num):
-
-        # perform_network_assignment_DTALite(assignment_mode,
-        #                                    iter_num,
-        #                                    column_update_num)
-        pass
-
-    def setup_spnetwork(self):
+    def setup_spnetwork(self, demand_directive=False):
         if self.has_created_spnet:
             return
 
         self.network.add_centroids_connectors()
+
         spvec = {}
+        partial_keys = {}
+        if demand_directive:
+            partial_keys = {k[:3]: None for k in self.column_pool}
 
         # z is zone id
         for z in self.get_zones():
-            if not z:
+            if not z or not self._has_outgoing_links(z):
                 continue
 
             for d in self.demands:
                 at = self.get_agent_type(d.get_agent_type_str())
                 dp = self.get_demand_period(d.get_period())
-                k = (at.get_id(), dp.get_id())
+                pk = (at.get_id(), dp.get_id(), z)
+
+                if demand_directive and pk not in partial_keys:
+                    continue
+
+                k = pk[:2]
                 if k not in spvec:
                     sp = SPNetwork(self.network, at, dp)
                     spvec[k] = sp
@@ -1626,9 +1664,7 @@ class Assignment:
         nodes = self.get_accessible_nodes(source_node_id, time_budget,
                                           mode, time_dependent, tau)
         # convert to link id's
-        return [
-            self.accessnetwork.get_pred_link_id(x) for x in nodes
-        ]
+        return [self.accessnetwork.get_pred_link_id(x) for x in nodes]
 
     def get_total_simu_intervals(self):
         return ceil(self.simu_dur * 60 / self.simu_rez)
@@ -1758,6 +1794,7 @@ class UI:
     """ an abstract class only with user interfaces """
     def __init__(self, assignment):
         self._base_assignment = assignment
+        self._agent_cost_type = 'time'
 
     def get_column_pool(self):
         return self._base_assignment.get_column_pool()
@@ -1780,37 +1817,23 @@ class UI:
 
     def get_agent_node_path(self, agent_id):
         """ return the sequence of node IDs along the agent path """
-        return self._base_assignment.get_agent_node_path(agent_id)
+        return self._base_assignment.get_agent_node_path(agent_id, self._agent_cost_type)
 
     def get_agent_link_path(self, agent_id):
         """ return the sequence of link IDs along the agent path """
-        return self._base_assignment.get_agent_link_path(agent_id)
+        return self._base_assignment.get_agent_link_path(agent_id, self._agent_cost_type)
 
     def get_agent_num(self):
         return self._base_assignment.network.get_agent_count()
 
-    def find_path_for_agents(self, mode='all'):
-        """ DEPRECATED
-
-        find and set up shortest path for each agent
-        """
-        return self._base_assignment.find_path_for_agents(mode)
-
-    def find_shortest_path(self, from_node_id, to_node_id,
-                           mode='all', seq_type='node'):
-        """ return shortest path between from_node_id and to_node_id
+    def get_shortest_path_tree(self, from_node_id,
+                               mode='all', seq_type='node', cost_type='time'):
+        """ return the shorest path tree from the source node (from_node_id)
 
         Parameters
         ----------
         from_node_id
-            the starting node id, which shall be a string
-
-        to_node_id
-            the ending node id, which shall be a string
-
-        seq_type
-            'node' or 'link'. You will get the shortest path in sequence of
-            either node IDs or link IDs. The default is 'node'.
+            the source (root) node id
 
         mode
             the target transportation mode which is defined in settings.yml. It
@@ -1818,6 +1841,83 @@ class UI:
             are equivalent inputs.
 
             The default is 'all', which means that links are open to all modes.
+
+        seq_type
+            'node' or 'link'. You will get the shortest path in sequence of
+            either node IDs or link IDs. The default is 'node'.
+
+        cost_type
+            'time' or 'distance'. find the shortest path according travel time
+            or travel distance.
+
+        Returns
+        -------
+        dictionary
+            shortest paths from the source node to any other nodes (the
+            source node itself is excluded).
+
+            key is to_node_id and value is the corresponding shortest path
+            information including path cost and path details (as a tuple).
+
+            path cost and path details are in line with the specified
+            cost_type and seq_type.
+        """
+
+        return self._base_assignment.get_shortest_path_tree(
+            from_node_id, mode, seq_type, cost_type
+        )
+
+    def find_path_for_agents(self, mode='all', cost_type='time'):
+        """ DEPRECATED
+
+        find and set up shortest path for each agent
+
+        Parameters
+        ----------
+        mode
+            the target transportation mode which is defined in settings.yml. It
+            can be either agent type or its name. For example, 'w' and 'walk'
+            are equivalent inputs.
+
+            The default is 'all', which means that links are open to all modes.
+
+        cost_type
+            'time' or 'distance'. find the shortest path according travel time
+            or travel distance.
+
+        Returns
+        -------
+        None
+        """
+        self._agent_cost_type = cost_type
+        return self._base_assignment.find_path_for_agents(mode, cost_type)
+
+    def find_shortest_path(self, from_node_id, to_node_id,
+                           mode='all', seq_type='node', cost_type='time'):
+        """ return shortest path between from_node_id and to_node_id
+
+        Parameters
+        ----------
+        from_node_id
+            the starting node id
+
+        to_node_id
+            the ending node id
+
+        mode
+            the target transportation mode which is defined in settings.yml. It
+            can be either agent type or its name. For example, 'w' and 'walk'
+            are equivalent inputs.
+
+            The default is 'all', which means that links are open to all modes.
+
+        seq_type
+            'node' or 'link'. You will get the shortest path in sequence of
+            either node IDs or link IDs. The default is 'node'.
+
+        cost_type
+            'time' or 'distance'. find the shortest path according travel time
+            or travel distance.
 
         Returns
         -------
@@ -1833,7 +1933,8 @@ class UI:
             from_node_id,
             to_node_id,
             mode,
-            seq_type
+            seq_type,
+            cost_type
         )
 
     def get_accessible_nodes(self,

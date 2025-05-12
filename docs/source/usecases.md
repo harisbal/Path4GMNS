@@ -12,7 +12,10 @@ pg.download_sample_data_sets()
 Note that [requests](https://pypi.org/project/requests/) (2.21.1 or higher) is needed for you to proceed downloading.
 
 ## Get the Shortest Path between Two Nodes
-Find the (static) shortest path (based on distance) and output it in the format of a sequence of node/link IDs.
+Find the (static) shortest path per travel time or distance and output it in the format of a sequence of node/link IDs.
+
+### Shortest Path in terms of Travel Time
+By default, find_shortest_path() will return the shortest path according to the travel time.
 ```python
 import path4gmns as pg
 
@@ -33,32 +36,127 @@ import path4gmns as pg
 
 network = pg.read_network(input_dir='data/Chicago_Sketch')
 
-# node path from node 1 to node 2
+# node path from node 1 to node 2 measured by travel time
 print('\nshortest path (node id) from node 1 to node 2, '
       +network.find_shortest_path(1, 2))
-# link path from node 1 to node 2
+# link path from node 1 to node 2 measured by travel time
 print('\nshortest path (link id) from node 1 to node 2, '
       +network.find_shortest_path(1, 2, seq_type='link'))
 ```
 
-Retrieving the shortest path between any two (different) nodes under a specific mode is now available under v0.7.2 or higher.
+Retrieving the shortest path between any two (different) nodes under a specific mode is available under v0.7.2 or higher.
 ```python
 import path4gmns as pg
 
 network = pg.read_network()
 
-# node path from node 1 to node 2 under mode w
+# node path from node 1 to node 2 under mode w measured by travel time
 print('\nshortest path (node id) from node 1 to node 2, '
       +network.find_shortest_path(1, 2, mode='w'))
-# link path from node 1 to node 2 under mode w
+# link path from node 1 to node 2 under mode w measured by travel time
 print('\nshortest path (link id) from node 1 to node 2, '
       +network.find_shortest_path(1, 2, mode='w', seq_type='link'))
 ```
 
 The mode passed to find_shortest_path() must be defined in settings.yaml, which could be either the type or the name. Take the above sample code for example, the type 'w' and its name 'walk' are equivalent to each other. See **Perform Multimodal Accessibility Evaluation** for more information.
 
+### Shortest Path in terms of Travel Distance
+Starting from v0.9.10, you can find the shortest path between any two different nodes in distance by specifying cost_type as 'distance'. The distance unit is the one passed to read_network(), which by default is mile.
+
+```python
+import path4gmns as pg
+
+network = pg.read_network()
+
+# node path from node 1 to node 2 measured by distance
+print('\nshortest path (node id) from node 1 to node 2, '
+      +network.find_shortest_path(1, 2, cost_type='distance'))
+# link path from node 1 to node 2 measured by distance
+print('\nshortest path (link id) from node 1 to node 2, '
+      +network.find_shortest_path(1, 2, seq_type='link', cost_type='distance'))
+
+# node path from node 1 to node 2 under mode w measured by distance
+print('\nshortest path (node id) from node 1 to node 2, '
+      +network.find_shortest_path(1, 2, mode='w', cost_type='distance'))
+# link path from node 1 to node 2 under mode w measured by distance
+print('\nshortest path (link id) from node 1 to node 2, '
+      +network.find_shortest_path(1, 2, mode='w', seq_type='link', cost_type='distance'))
+```
+
+## Retrieve the Shortest Path Tree
+If you need to find the shortest paths from a source node to any other nodes in the network. You can use get_shortest_path_tree() instead of repeatedly calling find_shortest_path(). Its usage is very similar to find_shortest_path(). You can get the shortest path tree in either node sequences or link sequences.
+
+```python
+import path4gmns as pg
+
+network = pg.read_network()
+
+# get shortest path tree (in node sequences) from node 1
+# cost is measured by time (in minutes)
+sp_tree_node = network.get_shortest_path_tree(1)
+# retrieve the shortest path from the source node (i.e., node 1) to node 2
+print(f'shortest path (node id) from node 1 to node 2: {sp_tree_node[2]}')
+# retrieve the shortest path from the source node (i.e., node 1) to node 3
+print(f'shortest path (node id) from node 1 to node 3: {sp_tree_node[3]}')
+
+# get shortest path tree (in link sequences) from node 1
+# cost is measured by time (in minutes)
+sp_tree_link = network.get_shortest_path_tree(1, seq_type='link')
+# retrieve the shortest path from the source node (i.e., node 1) to node 2
+print(f'shortest path (link id) from node 1 to node 2: {sp_tree_link[2]}')
+# retrieve the shortest path from the source node (i.e., node 1) to node 3
+print(f'shortest path (link id) from node 1 to node 3: {sp_tree_link[3]}')
+```
+
+Similarly, you can get the distance-based shortest path tree as well. The distance unit is in line with the one passed to read_network().
+
+```python
+import path4gmns as pg
+
+network = pg.read_network()
+
+# get shortest path tree (in node sequences) from node 1
+# cost is measured by distance (in miles)
+sp_tree_node = network.get_shortest_path_tree(1, cost_type='distance')
+# retrieve the shortest path from the source node (i.e., node 1) to node 2
+print(f'shortest path (node id) from node 1 to node 2: {sp_tree_node[2]}')
+# retrieve the shortest path from the source node (i.e., node 1) to node 3
+print(f'shortest path (node id) from node 1 to node 3: {sp_tree_node[3]}')
+
+# get shortest path tree (in link sequences) from node 1 (cost is measured by distance (in miles))
+sp_tree_link = network.get_shortest_path_tree(1, seq_type='link', cost_type='distance')
+# retrieve the shortest path from the source node (i.e., node 1) to node 2
+print(f'shortest path (link id) from node 1 to node 2: {sp_tree_link[2]}')
+# retrieve the shortest path from the source node (i.e., node 1) to node 3
+print(f'shortest path (link id) from node 1 to node 3: {sp_tree_link[3]}')
+```
+
+You can also get a shortest path tree with respect to a specific mode, which is specified in settings.yml.
+
+```python
+import path4gmns as pg
+
+network = pg.read_network()
+
+# get shortest path tree (in node sequences) from node 1 under mode 'w'
+# cost is measured by time (in minutes)
+sp_tree_node = network.get_shortest_path_tree(1, mode='w')
+# retrieve the shortest path from the source node (i.e., node 1) to node 2
+print(f'shortest path (node id) from node 1 to node 2: {sp_tree_node[2]}')
+# retrieve the shortest path from the source node (i.e., node 1) to node 3
+print(f'shortest path (node id) from node 1 to node 3: {sp_tree_node[3]}')
+
+# get shortest path tree (in link sequences) from node 1 under mode 'w'
+# cost is measured by distance
+sp_tree_link = network.get_shortest_path_tree(1, mode='w', seq_type='link', cost_type='distance')
+# retrieve the shortest path from the source node (i.e., node 1) to node 2
+print(f'shortest path (link id) from node 1 to node 2: {sp_tree_link[2]}')
+# retrieve the shortest path from the source node (i.e., node 1) to node 3
+print(f'shortest path (link id) from node 1 to node 3: {sp_tree_link[3]}')
+```
+
 ## Find Path-Based UE
-The Python column-generation module only implements path-based UE. If you need other assignment modes, e.g., link-based UE or DTA, please use perform_network_assignment_DTALite().
+The Python column-generation module only implements path-based UE. If you need other assignment modes, e.g., link-based UE or DTA, please use perform_network_assignment_DTALite(). Note that **column_gen_num** below specifies the maximum number of paths / columns for each OD pair.
 
 ```python
 import path4gmns as pg
@@ -68,17 +166,15 @@ pg.read_demand(network)
 
 # path-based UE only
 column_gen_num = 20
-column_update_num = 10
+column_upd_num = 20
 
-pg.find_ue(network, column_gen_num, column_update_num)
+pg.find_ue(network, column_gen_num, column_upd_num)
 
 # if you do not want to include geometry info in the output file,
 # use pg.output_columns(network, False)
 pg.output_columns(network)
 pg.output_link_performance(network)
 ```
-
-**NOTE THAT** you can still use the legacy _pg.perform_column_generation(column_gen_num, column_update_num, network)_ to perform the same functionality here. But it has been **deprecated**, and will be removed later.
 
 Starting from v0.7.0a1, Path4GMNS supports loading columns/paths from existing files (generated from either the Python module or DTALite) and continue the column-generation procedure from where you left. Please **skip the column generation stage** and go directly to column pool optimization by setting **column_gen_num = 0**.
 
@@ -93,17 +189,38 @@ pg.load_columns(network)
 
 # we recommend NOT doing assignment again after loading columns
 column_gen_num = 0
-column_update_num = 10
+column_upd_num = 20
 
-pg.find_ue(network, column_gen_num, column_update_num)
+pg.find_ue(network, column_gen_num, column_upd_num)
 
+pg.output_columns(network)
+pg.output_link_performance(network)
+```
+
+v0.9.10 provides users more flexibility to control UE convergency with the relative gap tolerance (i.e., the target relative gap). find_ue() will terminate when either column_upd_num or rel_gap_tolerance is reached and return the final relative gap.
+```python
+import path4gmns as pg
+
+network = pg.read_network()
+pg.read_demand(network)
+
+# path-based UE only
+column_gen_num = 20
+column_upd_num = 20
+
+# the default value of rel_gap_tolerance is 0.0001 if not specified
+rel_gap = pg.find_ue(network, column_gen_num, column_upd_num, rel_gap_tolerance = 0.001)
+print(f'the final relative UE gap is {rel_gap:.4%}')
+
+# if you do not want to include geometry info in the output file,
+# use pg.output_columns(network, False)
 pg.output_columns(network)
 pg.output_link_performance(network)
 ```
 
 ### In Case of Special Events
 
-A special event often comes with capacity reduction over affected links, which is now supported in v0.8.4 or higher. You can introduce one special event for each demand period in settings.yml as below.
+A special event often comes with capacity reduction over affected links, which is supported in v0.8.4 or higher. You can introduce one special event for each demand period in settings.yml as below.
 
 ```yaml
 demand_periods:
@@ -145,10 +262,10 @@ import path4gmns as pg
 
 # path-based UE
 mode = 1
-column_gen_num = 10
-column_update_num = 10
+column_gen_num = 20
+column_upd_num = 20
 
-pg.perform_network_assignment_DTALite(mode, column_gen_num, column_update_num)
+pg.perform_network_assignment_DTALite(mode, column_gen_num, column_upd_num)
 
 # no need to call output_columns() and output_link_performance()
 # since outputs will be processed within DTALite
@@ -183,14 +300,15 @@ $ brew install libomp
 ODME has been added to Path4GMNS since v0.9.9, which offers the same functionality as DTALite does. It intends to calibrate the UE result using observations (in terms of traffic counts) stated in measurement.csv. Therefore, UE is needed before running ODME.
 
 ```python
-network = pg.read_network()
+import path4gmns as pg
 
+network = pg.read_network()
 pg.read_demand(network)
 
 # path-based UE
 column_gen_num = 20
-column_update_num = 20
-pg.find_ue(network, column_gen_num, column_update_num)
+column_upd_num = 20
+pg.find_ue(network, column_gen_num, column_upd_num)
 
 # ODME
 pg.read_measurements(network)
@@ -205,14 +323,16 @@ pg.output_link_performance(network)
 You can also load existing UE results and then run ODME.
 
 ```python
-network = pg.read_network()
+import path4gmns as pg
 
+network = pg.read_network()
 # load existing UE result
 pg.load_columns(network)
 
 # ODME
-pg.conduct_odme(network, 20)
+odme_upd_num = 20
 pg.read_measurements(network)
+pg.conduct_odme(network, odme_upd_num)
 
 # output column information to route_assignment.csv
 pg.output_columns(network)
@@ -435,9 +555,9 @@ network = pg.read_network()
 pg.read_demand(network)
 
 # UE + DTA
-column_gen_num = 10
-column_update_num = 10
-pg.find_ue(network, column_gen_num, column_update_num)
+column_gen_num = 20
+column_upd_num = 20
+pg.find_ue(network, column_gen_num, column_upd_num)
 pg.perform_simple_simulation(network)
 print('complete dynamic simulation.\n')
 
@@ -464,7 +584,7 @@ print('writing agent trajectories')
 pg.output_agent_trajectory(network)
 ```
 
-The original implementation introduced in v0.9.0 (that each agent follows the shortest path from origin to destination) has been disabled. If you are still interested in traffic simulation using shortest paths, it can be achieved by setting column_gen_num as 1 and column_update_num as 0 illustrated below.
+The original implementation introduced in v0.9.0 (that each agent follows the shortest path from origin to destination) has been disabled. If you are still interested in traffic simulation using shortest paths, it can be achieved by setting column_gen_num as 1 and column_upd_num as 0 illustrated below.
 
 ```Python
 import path4gmns as pg
@@ -474,8 +594,8 @@ pg.read_demand(network)
 
 # the following setting will set up the shortest path for each agent
 column_gen_num = 1
-column_update_num = 0
-pg.find_ue(network, column_gen_num, column_update_num)
+column_upd_num = 0
+pg.find_ue(network, column_gen_num, column_upd_num)
 pg.perform_simple_simulation(network)
 print('complete dynamic simulation.\n')
 
@@ -531,8 +651,8 @@ pg.read_demand(network, use_synthetic_data=True)
 
 # perform some other functionalities from Path4GMNS, e.g., traffic assignment
 column_gen_num = 20
-column_update_num = 20
-pg.find_ue(network, column_gen_num, column_update_num)
+column_upd_num = 20
+pg.find_ue(network, column_gen_num, column_upd_num)
 
 pg.output_columns(network)
 pg.output_link_performance(network)

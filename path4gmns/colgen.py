@@ -5,7 +5,7 @@ from .classes import Column
 from .consts import EPSILON, MAX_LABEL_COST, MIN_COL_VOL
 
 
-__all__ = ['find_ue', 'perform_column_generation', 'perform_network_assignment']
+__all__ = ['find_ue']
 
 
 def _update_link_cost_array(spnetworks):
@@ -55,7 +55,8 @@ def _update_link_and_column_volume(column_pool, links, iter_num, reduce_path_vol
             # 06/11/24: if we check cv.is_route_fixed() here,
             # 1. shall we check it anywhere else??
             # 2. is it really necessary?
-            if reduce_path_vol and not cv.is_route_fixed():
+            # if reduce_path_vol and not cv.is_route_fixed():
+            if reduce_path_vol:
                 col.vol *= iter_num / (iter_num + 1)
 
 
@@ -79,14 +80,14 @@ def _update_column_gradient_cost_and_flow(column_pool, links, agent_types, iter_
             col.set_gradient_cost(path_gradient_cost)
 
             # col.get_volume() >= EPSILON is the key to eliminate ultra-low-volume
-            # columns. along with the blow new_vol reset if new_vol < MIN_COL_VOL,
+            # columns. along with the new_vol reset below if new_vol < MIN_COL_VOL,
             # it enables shifting volume from the shortest path to a non-shortest path.
             if path_gradient_cost < least_gradient_cost and col.get_volume() >= EPSILON:
                 least_gradient_cost = path_gradient_cost
                 least_gradient_cost_path_id = col.get_id()
 
         total_switched_out_path_vol = 0
-        if cv.get_column_num() >= 2:
+        if cv.get_column_num() > 1:
             for col in cv.get_columns():
                 if col.get_id() == least_gradient_cost_path_id:
                     continue
@@ -117,9 +118,10 @@ def _update_column_gradient_cost_and_flow(column_pool, links, agent_types, iter_
             col.increase_volume(total_switched_out_path_vol)
 
     rel_gap = total_gap / max(total_sys_travel_time, EPSILON)
-
     print(f'current iteration number in column update: {iter_num}\n'
           f'total gap: {total_gap:.4e}; relative gap: {rel_gap:.4%}')
+
+    return rel_gap
 
 
 def _backtrace_shortest_path_tree(centroid,
@@ -131,9 +133,6 @@ def _backtrace_shortest_path_tree(centroid,
                                   dp_id,
                                   column_pool,
                                   iter_num):
-
-    if not centroid.has_outgoing_links():
-        return
 
     oz_id = centroid.get_zone_id()
     k_path_prob = 1 / (iter_num + 1)
@@ -147,8 +146,9 @@ def _backtrace_shortest_path_tree(centroid,
             continue
 
         cv = column_pool[(at_id, dp_id, oz_id, dz_id)]
-        if cv.is_route_fixed():
-            continue
+        # disable it as it is always false
+        # if cv.is_route_fixed():
+        #     continue
 
         link_path = []
         dist = 0
@@ -189,21 +189,23 @@ def _backtrace_shortest_path_tree(centroid,
             cv.add_new_column(col)
 
 
-def _update_column_attributes(column_pool, links, agent_types):
+def _update_column_attributes(column_pool, links, agent_types, spnetworks):
     """ update toll and travel time for each column, and compute final UE convergency """
     total_gap = 0
     total_sys_travel_time = 0
+    total_min_sys_travel_time = 0
 
     for k, cv in column_pool.items():
         # k = (at, dp, oz, dz)
         dp = k[1]
         vot = agent_types[k[0]].get_vot()
+
         least_gradient_cost = MAX_LABEL_COST
 
         i = 0
         for col in cv.get_columns():
             if not col.get_volume():
-                col.reset()
+                del col
                 continue
 
             # reset column id
@@ -233,23 +235,33 @@ def _update_column_attributes(column_pool, links, agent_types):
             if path_gradient_cost < least_gradient_cost:
                 least_gradient_cost = path_gradient_cost
 
-        for col in cv.get_columns():
-            if not col.get_volume():
-                continue
+        total_min_sys_travel_time += least_gradient_cost * cv.get_od_volume()
 
-            col.update_gradient_cost_diffs(least_gradient_cost)
-            total_sys_travel_time += col.get_sys_travel_time()
-            total_gap += col.get_gap()
+    # an equivalent but more efficient way to compute the total system travel
+    # time when the column pool is large in size.
+    for sp in spnetworks:
+        tau = sp.get_demand_period().get_id()
+        vot = sp.get_agent_type().get_vot()
 
+        for link in sp.get_links():
+            if not link.length:
+                break
+
+            total_sys_travel_time += (
+                link.get_generalized_cost(tau, vot) * link.get_period_flow_vol(tau)
+            )
+
+    total_gap = total_sys_travel_time - total_min_sys_travel_time
     rel_gap = total_gap / max(total_sys_travel_time, EPSILON)
     print('current iteration number in column update: postprocessing\n'
           f'total gap: {total_gap:.4e}; relative gap: {rel_gap:.4%}\n')
 
+    return rel_gap
+
 
 def _generate(spn, column_pool, iter_num):
     for c in spn.get_orig_centroids():
-        node_id = c.get_node_id()
-        single_source_shortest_path(spn, node_id)
+        single_source_shortest_path(spn, c.get_node_id())
 
         _backtrace_shortest_path_tree(c,
                                       spn.get_centroids(),
@@ -269,78 +281,6 @@ def _generate_column_pool(spnetworks, column_pool, iter_num):
         _generate(spn, column_pool, iter_num)
 
 
-def perform_column_generation(column_gen_num, column_update_num, ui):
-    """ perform network assignment using the selected assignment mode
-
-    WARNING
-    -------
-    DEPRECATED due to its confusing name. Use find_ue() instead!
-
-    Only Path/Column-based User Equilibrium (UE) is implemented in Python.
-    If you need other assignment modes or dynamic traffic assignment (DTA),
-    please use perform_network_assignment_DTALite()
-
-    Parameters
-    ----------
-    column_gen_num
-        number of iterations to be performed on generating column pool
-        column pool
-
-    column_update_num
-        number of iterations to be performed on optimizing column pool
-
-    ui
-        network object generated by pg.read_network()
-
-    Returns
-    -------
-    None
-
-    Note
-    ----
-    You will need to call output_columns() and output_link_performance() to
-    get the assignment results, i.e., paths/columns (in route_assignment.csv) and
-    assigned volumes and other link attributes on each link (in link_performance.csv)
-    """
-    # make sure iteration numbers are both non-negative
-    assert(column_gen_num>=0)
-    assert(column_update_num>=0)
-
-    # base assignment
-    A = ui._base_assignment
-    # set up SPNetwork
-    A.setup_spnetwork()
-
-    links = A.get_links()
-    ats = A.get_agent_types()
-    column_pool = A.get_column_pool()
-
-    print('find user equilibrium (UE)')
-    st = time()
-
-    for i in range(column_gen_num):
-        print(f'current iteration number in column generation: {i}')
-
-        _update_link_and_column_volume(column_pool, links, i)
-        _update_link_travel_time(links)
-        # update generalized link cost before assignment
-        _update_link_cost_array(A.get_spnetworks())
-        # loop through all centroids on the base network
-        _generate_column_pool(A.get_spnetworks(), column_pool, i)
-
-    print(f'\nprocessing time of generating columns: {time()-st:.2f} s\n')
-
-    for i in range(column_update_num):
-        _update_link_and_column_volume(column_pool, links, i, False)
-        _update_link_travel_time(links)
-        _update_column_gradient_cost_and_flow(column_pool, links, ats, i)
-
-    # postprocessing
-    _update_link_and_column_volume(column_pool, links, column_gen_num, False)
-    _update_link_travel_time(links)
-    _update_column_attributes(column_pool, links, ats)
-
-
 def update_links_using_columns(network):
     """ a helper function for load_columns() """
     A = network._base_assignment
@@ -353,24 +293,7 @@ def update_links_using_columns(network):
     _update_link_travel_time(links)
 
 
-def perform_network_assignment(assignment_mode, column_gen_num, column_update_num, ui):
-    """DEPRECATED Column Generation API. Use find_ue() instead!
-
-    Keep it here as legacy support for existing users who already get used to it
-    """
-    print('This function has been deprecated, and will be removed later!'
-          'Please use perform_column_generation() instead.')
-
-    if assignment_mode != 1:
-        raise Exception(
-            'NOT implemented yet!'
-            'Please please use perform_network_assignment_DTALite().'
-        )
-
-    perform_column_generation(column_gen_num, column_update_num, ui)
-
-
-def find_ue(ui, column_gen_num, column_update_num):
+def find_ue(ui, column_gen_num, column_upd_num, rel_gap_tolerance=0.0001):
     """ find user equilibrium (UE)
 
     WARNING
@@ -386,19 +309,69 @@ def find_ue(ui, column_gen_num, column_update_num):
 
     column_gen_num
         number of iterations to be performed on generating column pool
-        column pool
+        column pool. it also specifies the maximum number of routes / columns
+        for each OD pair.
 
-    column_update_num
+    column_upd_num
         number of iterations to be performed on optimizing column pool
+
+    rel_gap_tolerance
+        target relative gap. find_ue() stops when either column_upd_num or
+        rel_gap_tolerance is reached.
 
     Returns
     -------
-    None
+    rel_gap
+        relative GAP to measure the UE convergency
 
     Note
     ----
     You will need to call output_columns() and output_link_performance() to
     get the assignment results, i.e., paths/columns (in route_assignment.csv) and
-    volumes and other link attributes on each link (in link_performance.csv)
+    volumes and other link attributes on each link (in link_performance.csv).
     """
-    perform_column_generation(column_gen_num, column_update_num, ui)
+    # make sure iteration numbers are both non-negative
+    assert(column_gen_num>=0)
+    assert(column_upd_num>=0)
+
+    # base assignment
+    A = ui._base_assignment
+    # set up SPNetwork
+    A.setup_spnetwork(True)
+
+    ats = A.get_agent_types()
+    column_pool = A.get_column_pool()
+    links = A.get_links()
+
+    print('find user equilibrium (UE)')
+    st = time()
+
+    for i in range(column_gen_num):
+        print(f'current iteration number in column generation: {i}')
+
+        _update_link_and_column_volume(column_pool, links, i)
+        _update_link_travel_time(links)
+        # update generalized link cost before assignment
+        _update_link_cost_array(A.get_spnetworks())
+        # loop through all centroids on the base network
+        _generate_column_pool(A.get_spnetworks(), column_pool, i)
+
+    print(f'\nprocessing time of generating columns: {time()-st:.2f}s\n')
+    st = time()
+
+    i = 0
+    rel_gap = 1
+    while i < column_upd_num and rel_gap_tolerance < rel_gap:
+        _update_link_and_column_volume(column_pool, links, i, False)
+        _update_link_travel_time(links)
+        rel_gap = _update_column_gradient_cost_and_flow(column_pool, links, ats, i)
+        i += 1
+
+    # postprocessing
+    _update_link_and_column_volume(column_pool, links, column_gen_num, False)
+    _update_link_travel_time(links)
+    rel_gap = _update_column_attributes(column_pool, links, ats, A.get_spnetworks())
+
+    print(f'processing time of updating columns and postprocessing: {time()-st:.2f}s\n')
+
+    return rel_gap

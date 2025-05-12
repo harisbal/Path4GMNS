@@ -44,7 +44,7 @@
 42. Enhance DemandPeriod setup on time_period (v0.9.4)
 43. Fix multiple bugs related to simulation including calculation of agent arrival time and agent waiting time, link traverse time, and link outflow cap (v0.9.4)
 44. Remove memory_blocks and its implementations (which were intended for multiprocessing) (v0.9.4)
-45. Bring back the postprocessing after UE in case users do not do column updating (i.e., column_update_num = 0) (v0.9.4)
+45. Bring back the postprocessing after UE in case users do not do column updating (i.e., column_upd_num = 0) (v0.9.4)
 46. Drop the requirement that node id must be integer (v0.9.5)
 47. Drop the requirement that zone id must be integer (v0.9.5)
 48. Eliminate ultra-low-volume columns from assignment (v0.9.6)
@@ -61,5 +61,14 @@
 59. Add CMakeFiles.txt to better manage local builds and installs (v0.9.9)
 60. Reestablish cross-validation of zone id in node.csv and demand.csv (which was dropped in v0.9.9) (v0.9.9.post1)
 61. Fix potential inconsistency in essential arrays (between the underlying physical network and the shortest path network (i.e., SPNetwork)) for shortest path calculation, which would lead to [OSError](https://github.com/jdlph/Path4GMNS/issues/51) (v0.9.9.post1)
+62. Reinstate warning for missing pyyaml (v0.9.10)
+63. Optimize the UE module by precluding zones with no valid demand and moving the check on each centroid into SPNetwork setup (v0.9.10)
+64. Optimize the UE module on computing the relative gap in the postprocessing (v0.9.10)
+65. Include rel_gap_tolerance as an additional argument to find_ue() and return the final relative gap (v0.9.10)
+66. Fix bug on path cost unit for find_shortest_path() reported in Issue #58 (v0.9.10)
+67. Find the shortest path in either travel distance or travel time (v0.9.10)
+68. Adaptively display the path distance per the length unit passed to read_network() (v0.9.10)
+69. Introduce get_shortest_path_tree() to return the shortest path tree from a given source node (v0.9.10)
+70. Remove deprecated APIs including perform_column_generation(), perform_network_assignment(), perform_network_assignment(), and perform_network_assignment_DTALite() (v0.9.10)
 
 Detailed update information can be found in [Releases](https://github.com/jdlph/Path4GMNS/releases).

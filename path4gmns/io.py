@@ -6,10 +6,10 @@ from .classes import Node, Link, Zone, Network, Column, ColumnVec, VDFPeriod, \
                      AgentType, DemandPeriod, Demand, SpecialEvent, Assignment, UI
 
 from .colgen import update_links_using_columns
-from .consts import EPSILON, MILE_TO_METER, MPH_TO_KPH
-from .utils import InvalidRecord, _are_od_connected, _convert_boundaries, \
-                   _convert_str_to_float, _convert_str_to_int, _get_time_stamp, \
-                   _update_dest_zone, _update_orig_zone
+from .consts import EPSILON
+from .utils import InvalidRecord, _convert_boundaries, _convert_str_to_float, \
+                   _convert_str_to_int, _get_time_stamp, get_len_unit_conversion_factor, \
+                   get_spd_unit_conversion_factor
 from .zonesyn import network_to_zones
 
 
@@ -26,6 +26,47 @@ __all__ = [
     'output_synthetic_zones',
     'output_synthetic_demand'
 ]
+
+
+# for precheck on connectivity of each OD pair
+# 0: isolated, has neither outgoing links nor incoming links
+# 1: has at least one outgoing link
+# 2: has at least one incoming link
+# 3: has both outgoing and incoming links
+_zone_degrees = {}
+
+
+def _update_orig_zone(oz_id):
+    if oz_id not in _zone_degrees:
+        _zone_degrees[oz_id] = 1
+    elif _zone_degrees[oz_id] == 2:
+        _zone_degrees[oz_id] = 3
+
+
+def _update_dest_zone(dz_id):
+    if dz_id not in _zone_degrees:
+        _zone_degrees[dz_id] = 2
+    elif _zone_degrees[dz_id] == 1:
+        _zone_degrees[dz_id] = 3
+
+
+def _are_od_connected(oz_id, dz_id):
+    connected = True
+
+    # at least one node in O must have outgoing links
+    if oz_id not in _zone_degrees or _zone_degrees[oz_id] == 2:
+        connected = False
+        print(f'WARNING! {oz_id} has no outgoing links to route volume '
+              f'between OD: {oz_id} --> {dz_id}')
+
+    # at least one node in D must have incoming links
+    if dz_id not in _zone_degrees or _zone_degrees[dz_id] == 1:
+        if connected:
+            connected = False
+        print(f'WARNING! {dz_id} has no incoming links to route volume '
+              f'between OD: {oz_id} --> {dz_id}')
+
+    return connected
 
 
 def read_nodes(input_dir,
@@ -114,8 +155,8 @@ def read_links(input_dir,
                map_id_to_no,
                link_ids,
                demand_period_size,
-               length_unit,
-               speed_unit,
+               len_conversion_factor,
+               spd_conversion_factor,
                load_demand):
     """ step 2: read input_link """
     with open(input_dir+'/link.csv', 'r') as fp:
@@ -213,13 +254,8 @@ def read_links(input_dir,
             link_ids[link_id] = link_no
 
             # unit conversion
-            if length_unit.startswith('meter') or length_unit == 'm':
-                length = length / MILE_TO_METER
-            elif length_unit.startswith('kilometer') or length_unit.startswith('km'):
-                length = length / MPH_TO_KPH
-
-            if speed_unit.startswith('kmh') or speed_unit.startswith('kph'):
-                free_speed = free_speed / MPH_TO_KPH
+            length = length / len_conversion_factor
+            free_speed = free_speed / spd_conversion_factor
 
             # construct link object
             link = Link(link_id,
@@ -395,7 +431,7 @@ def _read_demand(input_dir,
             # Case II:  zones is not empty and invalid_od_num == 0
             #           Every zone_id present in demand.csv is not found in
             #           node.csv. This implies data inconsistency between these
-            #           two files on zone_id). Another possibility is that volume
+            #           two files on zone_id. Another possibility is that volume
             #           is not numerical.
             # Case III: zones is not empty, invalid_od_num > 0, and invalid_vol == 0
             #           All OD pairs in demand.csv have invalid volume (i.e.,
@@ -506,64 +542,6 @@ def _read_zones(ui, input_dir='.', filename='syn_zone.csv'):
                 raise Exception(f'DUPLICATE zone id: {zone_id}')
 
         print(f'the number of zones is {len(zones):,d}')
-
-
-def read_demand_matrix(input_dir, agent_type_id, demand_period_id,
-                       zone_to_node_dict, column_pool):
-    """ read demand matrix from input_matrix
-
-    not in use
-    """
-    with open(input_dir+'/input_matrix.csv', 'r') as fp:
-        print('read input_matrix.csv')
-
-        at = agent_type_id
-        dp = demand_period_id
-
-        total_vol = 0
-        reader = csv.DictReader(fp)
-        for line in reader:
-            oz_id = line['od']
-            # o_zone_id does not exist in node.csv, discard it
-            if oz_id not in zone_to_node_dict:
-                continue
-
-            for dz_str, vol_str in line:
-                dz_id = _convert_str_to_int(dz_str)
-                if dz_id == oz_id:
-                    continue
-
-                # d_zone_id does not exist in node.csv, discard it
-                if dz_id not in zone_to_node_dict:
-                    continue
-
-                try:
-                    vol = _convert_str_to_float(vol_str)
-                except InvalidRecord:
-                    continue
-
-                if vol == 0:
-                    continue
-
-                if not _are_od_connected(oz_id, dz_id):
-                    continue
-
-                if (at, dp, oz_id, dz_id) not in column_pool:
-                    column_pool[(at, dp, oz_id, dz_id)] = ColumnVec()
-                    column_pool[(at, dp, oz_id, dz_id)].set_volume(vol)
-                else:
-                    raise Exception(
-                        f'DUPLICATE OD pair found between {oz_id} and {dz_id}'
-                    )
-
-                total_vol += vol
-
-            print(f'the number of agents is {total_vol}')
-
-            if total_vol == 0:
-                raise Exception(
-                    'NO VALID OD VOLUME!! DOUBLE CHECK YOUR input_matrix.csv'
-                )
 
 
 def _auto_setup(assignment):
@@ -689,46 +667,34 @@ def read_settings(input_dir, assignment):
 
     except ImportError:
         # just in case user does not have pyyaml installed
-        # warnings.warn(
-        #     'Please install pyyaml next time!\n'
-        #     'Engine will set up one demand period and one agent type using '
-        #     'default values for you, which might NOT reflect your case!'
-        # )
+        warnings.warn(
+            'Please install pyyaml next time!\n'
+            'Engine will set up one demand period and one agent type using '
+            'default values for you, which might NOT reflect your case!'
+        )
         _auto_setup(assignment)
     except FileNotFoundError:
         # just in case user does not provide settings.yml
-        # warnings.warn(
-        #     'Please provide settings.yml next time!\n'
-        #     'Engine will set up one demand period and one agent type using '
-        #     'default values for you, which might NOT reflect your case!'
-        # )
+        warnings.warn(
+            'Please provide settings.yml next time!\n'
+            'Engine will set up one demand period and one agent type using '
+            'default values for you, which might NOT reflect your case!'
+        )
         _auto_setup(assignment)
     except Exception as e:
         raise e
 
 
 def read_network(length_unit='mile', speed_unit='mph', input_dir='.'):
-    len_units = ['kilometer', 'km', 'meter', 'm', 'mile', 'mi']
-    spd_units = ['kmh', 'kph', 'mph']
-
-    # length and speed units check
-    # linear search is OK for such small lists
-    if length_unit not in len_units:
-        units = ', '.join(len_units)
-        raise Exception(
-            f'Invalid length unit: {length_unit} !'
-            f' Please choose one available unit from {units}'
-        )
-
-    if speed_unit not in spd_units:
-        units = ', '.join(spd_units)
-        raise Exception(
-            f'Invalid speed unit: {speed_unit} !'
-            f' Please choose one available unit from {units}'
-        )
+    # exception handlings on units are taken care by the following two functions
+    len_cf = get_len_unit_conversion_factor(length_unit)
+    spd_cf = get_spd_unit_conversion_factor(speed_unit)
 
     assignm = Assignment()
     network = Network()
+
+    network.len_unit = length_unit
+    network.len_unit_cf = len_cf
 
     read_settings(input_dir, assignm)
 
@@ -745,8 +711,8 @@ def read_network(length_unit='mile', speed_unit='mph', input_dir='.'):
                network.map_id_to_no,
                network.link_ids,
                assignm.get_demand_period_count(),
-               length_unit,
-               speed_unit,
+               len_cf,
+               spd_cf,
                load_demand)
 
     network.update()
@@ -1285,7 +1251,7 @@ def output_agent_trajectory(ui, output_dir='.'):
             # to calculate trip time does not make sense
             tt = at_ - a.get_dep_time()
 
-            node_path_str = A.get_agent_node_path(a.get_id(), True)
+            node_path_str = A.get_agent_node_path(a.get_id())
             geometry = ', '.join(
                 nodes[x].get_coordinate() for x in reversed(a.get_node_path())
             )

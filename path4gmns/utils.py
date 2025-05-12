@@ -2,54 +2,15 @@ import os
 from datetime import timedelta
 from threading import Thread
 
+from .consts import MILE_TO_METER, MPH_TO_KPH
+
 
 __all__ = ['download_sample_data_sets', 'download_sample_setting_file']
-
-
-# for precheck on connectivity of each OD pair
-# 0: isolated, has neither outgoing links nor incoming links
-# 1: has at least one outgoing link
-# 2: has at least one incoming link
-# 3: has both outgoing and incoming links
-_zone_degrees = {}
 
 
 class InvalidRecord(Exception):
     """a custom exception for invalid input from parsing a csv file"""
     pass
-
-
-def _update_orig_zone(oz_id):
-    if oz_id not in _zone_degrees:
-        _zone_degrees[oz_id] = 1
-    elif _zone_degrees[oz_id] == 2:
-        _zone_degrees[oz_id] = 3
-
-
-def _update_dest_zone(dz_id):
-    if dz_id not in _zone_degrees:
-        _zone_degrees[dz_id] = 2
-    elif _zone_degrees[dz_id] == 1:
-        _zone_degrees[dz_id] = 3
-
-
-def _are_od_connected(oz_id, dz_id):
-    connected = True
-
-    # at least one node in O must have outgoing links
-    if oz_id not in _zone_degrees or _zone_degrees[oz_id] == 2:
-        connected = False
-        print(f'WARNING! {oz_id} has no outgoing links to route volume '
-              f'between OD: {oz_id} --> {dz_id}')
-
-    # at least one node in D must have incoming links
-    if dz_id not in _zone_degrees or _zone_degrees[dz_id] == 1:
-        if connected:
-            connected = False
-        print(f'WARNING! {dz_id} has no incoming links to route volume '
-              f'between OD: {oz_id} --> {dz_id}')
-
-    return connected
 
 
 # a little bit ugly
@@ -144,14 +105,13 @@ def _get_time_stamp(minute):
 def _download_url(url, filename, loc_dir):
     try:
         import requests
-    except ImportError:
-        print('please print requests to proceed downloading!!')
 
-    try:
         r = requests.get(url)
         r.raise_for_status()
         with open(loc_dir+filename, 'wb') as f:
             f.write(r.content)
+    except ImportError:
+        print('please install requests to proceed downloading!!')
     except requests.HTTPError:
         print(f'file not existing: {url}')
     except requests.ConnectionError:
@@ -181,6 +141,7 @@ def download_sample_data_sets():
         "node.csv",
         "link.csv",
         "demand.csv",
+        "measurement.csv",
         "settings.csv",
         "settings.yml"
     ]
@@ -226,3 +187,41 @@ def download_sample_setting_file():
 
     print('downloading completes')
     print(f'check {os.getcwd()} for downloaded settings.yml')
+
+
+def get_len_unit_conversion_factor(unit):
+    len_units = ['kilometer', 'km', 'meter', 'm', 'mile', 'mi']
+
+    # length unit check
+    # linear search is OK for such small lists
+    if unit not in len_units:
+        units = ', '.join(len_units)
+        raise Exception(
+            f'Invalid length unit: {unit} !'
+            f' Please choose one available unit from {units}'
+        )
+
+    cf = 1
+    if unit.startswith('meter') or unit == 'm':
+        cf = MILE_TO_METER
+    elif unit.startswith('kilometer') or unit.startswith('km'):
+        cf = MPH_TO_KPH
+
+    return cf
+
+
+def get_spd_unit_conversion_factor(unit):
+    spd_units = ['kmh', 'kph', 'mph']
+
+    # speed unit check
+    if unit not in spd_units:
+        units = ', '.join(spd_units)
+        raise Exception(
+            f'Invalid speed unit: {unit} !'
+            f' Please choose one available unit from {units}'
+        )
+
+    if unit.startswith('kmh') or unit.startswith('kph'):
+        return MPH_TO_KPH
+
+    return 1
